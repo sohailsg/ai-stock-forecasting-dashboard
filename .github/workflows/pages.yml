@@ -30,7 +30,7 @@ jobs:
       - name: assemble site
         run: |
           rm -rf _site && mkdir -p _site/output
-          cp dashboard/index.html dashboard/stocks.html dashboard/app.js dashboard/stocks.js dashboard/style.css dashboard/CNAME _site/
+          cp dashboard/index.html dashboard/stocks.html dashboard/app.js dashboard/stocks.js dashboard/theme.js dashboard/style.css dashboard/CNAME _site/
           cp -r output/summary.json output/monthly_revenue.json output/revenue_by_product.json output/revenue_by_region.json output/insights.json _site/output/ 2>/dev/null || true
           cp -r output/stocks _site/output/stocks
           echo "sohail-ahmed.space" > _site/CNAME

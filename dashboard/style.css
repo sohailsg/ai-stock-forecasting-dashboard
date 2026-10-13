@@ -1,78 +1,213 @@
-/* ── Reset & base ─────────────────────────────────────────────────────────── */
-
-/* box-sizing: border-box makes width/height include padding and border,
-   which is much more intuitive than the default browser behaviour. */
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+/* ── Design tokens ─────────────────────────────────────────────────────── */
+:root {
+  --bg: #f0f2f5;
+  --surface: #ffffff;
+  --surface-2: #f7f8fb;
+  --text: #1c1c28;
+  --muted: #667085;
+  --primary: #4361ee;
+  --primary-ink: #ffffff;
+  --accent: #7209b7;
+  --danger: #c0392b;
+  --warn-bg: #fff3cd;
+  --warn-border: #e6c200;
+  --border: #e4e7ec;
+  --radius: 10px;
+  --shadow: 0 1px 4px rgba(16, 24, 40, 0.08);
+  --shadow-lg: 0 8px 24px rgba(16, 24, 40, 0.12);
+  --chart-grid: rgba(16, 24, 40, 0.08);
+  --chart-tick: #667085;
+  color-scheme: light;
 }
+
+[data-theme="dark"] {
+  --bg: #0f1420;
+  --surface: #1a2233;
+  --surface-2: #141b2a;
+  --text: #eef1f6;
+  --muted: #9aa4b2;
+  --primary: #7c94ff;
+  --primary-ink: #0f1420;
+  --accent: #c77dff;
+  --danger: #ff8a80;
+  --warn-bg: #3a2f0b;
+  --warn-border: #8a6d00;
+  --border: #2a3446;
+  --shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --chart-grid: rgba(255, 255, 255, 0.08);
+  --chart-tick: #9aa4b2;
+  color-scheme: dark;
+}
+
+/* ── Reset & base ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: system-ui, sans-serif; /* uses the OS default font — no import needed */
-  background: #f0f2f5;
-  color: #222;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
   padding: 1.5rem;
+  max-width: 1100px;
+  margin: 0 auto;
+  line-height: 1.5;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
-header h1 {
-  font-size: 1.75rem;
-  margin-bottom: 1.5rem;
-  color: #1a1a2e;
-}
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
+/* ── Header & nav ─────────────────────────────────────────────────────────── */
+header.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1.5rem;
+  margin-bottom: 1.25rem;
+}
+header.topbar h1 { font-size: 1.75rem; letter-spacing: -0.01em; }
+header.topbar .spacer { flex: 1; }
+
+nav.topnav { display: flex; gap: 0.25rem; align-items: center; }
+nav.topnav a {
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 8px;
+}
+nav.topnav a:hover { background: var(--surface-2); color: var(--text); }
+nav.topnav a[aria-current="page"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+
+/* ── Buttons & inputs ─────────────────────────────────────────────────────── */
+.btn {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.05s ease, background 0.15s ease;
+}
+.btn:hover { background: var(--surface-2); }
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--primary); border-color: var(--primary); color: var(--primary-ink); }
+.btn-primary:hover { filter: brightness(1.08); background: var(--primary); }
+.btn[aria-pressed="true"] { background: var(--text); border-color: var(--text); color: var(--bg); }
+
+select, input[type="range"] { accent-color: var(--primary); }
+select {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.9rem;
+}
 
 /* ── KPI cards ────────────────────────────────────────────────────────────── */
-
-/* CSS Grid with auto-fit + minmax makes the cards responsive automatically:
-   they fill the row and wrap to the next line when the screen is too narrow.
-   No media queries needed. */
 .kpi-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 1rem;
-  margin-bottom: 2rem;
-}
-
-.card {
-  background: #ffffff;
-  border-radius: 8px;
-  padding: 1.25rem 1rem;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-}
-
-.card h2 {
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #888;
-  margin-bottom: 0.5rem;
-}
-
-.kpi-value {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: #1a1a2e;
-}
-
-
-/* ── Chart sections ───────────────────────────────────────────────────────── */
-
-.chart-section {
-  background: #ffffff;
-  border-radius: 8px;
-  padding: 1.5rem;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
   margin-bottom: 1.5rem;
 }
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem 1rem;
+  box-shadow: var(--shadow);
+}
+.card h2 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 0.4rem;
+}
+.kpi-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-height: 2.2rem;
+}
+.kpi-sub { font-size: 0.8rem; color: var(--muted); }
 
-.chart-section h2 {
-  font-size: 1rem;
-  color: #555;
-  margin-bottom: 1rem;
+/* Loading shimmer for KPI values */
+.loading { position: relative; overflow: hidden; color: transparent !important; }
+.loading::after {
+  content: ""; position: absolute; inset: 0; border-radius: 6px;
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .loading::after { animation: none; }
+  * { transition: none !important; }
 }
 
-/* Limit chart height so tall charts don't push content off screen */
-.chart-section canvas {
-  max-height: 320px;
+/* ── Sections & charts ────────────────────────────────────────────────────── */
+.chart-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.25rem 1rem;
+  box-shadow: var(--shadow);
+  margin-bottom: 1.25rem;
+}
+.chart-section h2 { font-size: 1rem; color: var(--muted); margin-bottom: 0.9rem; font-weight: 700; }
+.chart-section h2 .tag { font-weight: 400; font-size: 0.8rem; }
+.chart-wrap { position: relative; height: 340px; }
+.chart-wrap.tall { height: 420px; }
+.chart-wrap canvas { max-height: 100%; }
+
+/* ── Controls bar ─────────────────────────────────────────────────────────── */
+.controls { display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; align-items: center; }
+.controls .group { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.controls .group-label { font-size: 0.8rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+.toggles { display: flex; flex-wrap: wrap; gap: 0.2rem 0.9rem; }
+.toggles label { font-size: 0.9rem; display: inline-flex; gap: 0.35rem; align-items: center; cursor: pointer; }
+.slider-row { display: flex; align-items: center; gap: 0.6rem; font-size: 0.9rem; }
+.slider-row output { font-variant-numeric: tabular-nums; min-width: 6ch; }
+
+/* ── Banner, lists, footer ────────────────────────────────────────────────── */
+.banner {
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  color: var(--text);
+  padding: 0.65rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  display: none;
+  font-size: 0.9rem;
+}
+.error-box { padding: 2rem; color: var(--danger); }
+.error-box ol { margin-top: 0.5rem; padding-left: 1.5rem; line-height: 2; }
+
+ul.clean { padding-left: 1.2rem; font-size: 0.9rem; }
+ul.clean li { margin-bottom: 0.25rem; font-variant-numeric: tabular-nums; }
+
+footer.site {
+  margin: 1.5rem 0 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.8rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.5rem;
+}
+footer.site .dot::before { content: "· "; }
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+@media (max-width: 560px) {
+  body { padding: 1rem; }
+  header.topbar h1 { font-size: 1.35rem; }
+  .kpi-value { font-size: 1.3rem; }
+  .chart-wrap, .chart-wrap.tall { height: 280px; }
 }
