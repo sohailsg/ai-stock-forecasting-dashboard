@@ -66,11 +66,11 @@
     </section>
 
     <section class="kpi-cards" aria-label="Key metrics" aria-live="polite">
-      <div class="card" title="Latest closing price"><h2>Last close</h2><p class="kpi-value loading" id="kpi-close">—</p></div>
-      <div class="card" title="Price change over the last ~21 trading days"><h2>1M change</h2><p class="kpi-value loading" id="kpi-chg">—</p></div>
-      <div class="card" title="How much the price typically swings, scaled to a year. Higher = bumpier ride."><h2>Volatility</h2><p class="kpi-value loading" id="kpi-vol">—</p></div>
-      <div class="card" title="Return earned per unit of risk. Above 1 is strong, below 0 means the ride wasn't worth it."><h2>Sharpe</h2><p class="kpi-value loading" id="kpi-sharpe">—</p></div>
-      <div class="card" title="Worst fall from a peak. -30% means buyers at the top are down almost a third."><h2>Max drawdown</h2><p class="kpi-value loading" id="kpi-dd">—</p></div>
+      <div class="card" title="Latest closing price (every view ends today)"><h2>Last close</h2><p class="kpi-value loading" id="kpi-close">—</p></div>
+      <div class="card" title="Price change across the history range you picked above"><h2 id="kpi-chg-label">1M change</h2><p class="kpi-value loading" id="kpi-chg">—</p></div>
+      <div class="card" title="How much the price swung inside your selected range, scaled to a year. Higher = bumpier ride."><h2 id="kpi-vol-label">Volatility</h2><p class="kpi-value loading" id="kpi-vol">—</p></div>
+      <div class="card" title="Return per unit of risk inside your selected range. Above 1 is strong, below 0 means the ride wasn't worth it."><h2 id="kpi-sharpe-label">Sharpe</h2><p class="kpi-value loading" id="kpi-sharpe">—</p></div>
+      <div class="card" title="Worst peak-to-trough fall inside your selected range."><h2 id="kpi-dd-label">Max drawdown</h2><p class="kpi-value loading" id="kpi-dd">—</p></div>
       <div class="card" title="Did our forecast model beat simply repeating today's price? MAPE = average % error."><h2>Backtest</h2><p class="kpi-value loading" id="kpi-bt" style="font-size:.95rem">—</p></div>
     </section>
 
@@ -92,6 +92,7 @@
     <section class="chart-section" aria-label="Insight and anomalies">
       <h2>AI Insight <span class="tag">(AI-generated, educational only)</span></h2>
       <p id="ai-insight">Loading…</p>
+      <p class="kpi-sub" id="ai-live" aria-live="polite"></p>
       <p class="kpi-sub" id="ai-tag">Forecast reliability: —</p>
       <h2 style="margin-top:1.25rem">Recent anomalies <span class="tag">(unusual daily moves)</span></h2>
       <ul class="clean" id="anomaly-list"><li>Loading…</li></ul>

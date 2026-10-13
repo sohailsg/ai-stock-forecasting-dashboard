@@ -52,6 +52,30 @@ function setControls() {
   document.getElementById("horizon-out").textContent = `${state.fcDays} days`;
 }
 
+function windowStats(closes) {
+  // Metrics over the visible window only — null when too few points.
+  const xs = closes.filter((v) => v != null);
+  if (xs.length < 2) return null;
+  const rets = [];
+  for (let i = 1; i < xs.length; i++) rets.push(xs[i] / xs[i - 1] - 1);
+  const mean = rets.reduce((a, b) => a + b, 0) / rets.length;
+  const sd = Math.sqrt(rets.reduce((a, b) => a + (b - mean) ** 2, 0) / rets.length);
+  let peak = xs[0], dd = 0;
+  xs.forEach((v) => { peak = Math.max(peak, v); dd = Math.min(dd, v / peak - 1); });
+  return {
+    n: xs.length,
+    change: (xs[xs.length - 1] / xs[0] - 1) * 100,
+    volatility: rets.length >= 10 ? sd * Math.sqrt(252) : null,
+    sharpe: rets.length >= 10 && sd > 0 ? (mean / sd) * Math.sqrt(252) : null,
+    drawdown: dd * 100,
+    last: xs[xs.length - 1],
+  };
+}
+
+function rangeName() {
+  return { 30: "1M", 180: "6M", 365: "1Y", 1825: "5Y" }[state.range] || `${state.range}d`;
+}
+
 function sliceRange(payload) {
   const n = Math.min(state.range, payload.dates.length);
   const cut = payload.dates.length - n;
@@ -142,11 +166,20 @@ function render(payload) {
     el.classList.remove("loading");
     el.textContent = txt;
   };
+  // Window-aware metrics: everything follows the selected history range.
+  // "Last close" is always the latest price (every window ends today).
+  const w = windowStats(s.close) || {};
+  const rn = rangeName();
+  const setLabel = (id, txt) => { document.getElementById(id).textContent = txt; };
   set("kpi-close", fmtMoney(st.last_close, payload.ticker));
-  set("kpi-chg", `${st.change_1m > 0 ? "+" : ""}${st.change_1m}%`);
-  set("kpi-vol", st.volatility ?? "—");
-  set("kpi-sharpe", st.sharpe ?? "—");
-  set("kpi-dd", `${st.max_drawdown}%`);
+  set("kpi-chg", w.change == null ? "—" : `${w.change > 0 ? "+" : ""}${w.change.toFixed(2)}%`);
+  setLabel("kpi-chg-label", `Change · ${rn}`);
+  set("kpi-vol", w.volatility == null ? "—" : w.volatility.toFixed(4));
+  setLabel("kpi-vol-label", `Volatility · ${rn}`);
+  set("kpi-sharpe", w.sharpe == null ? "—" : w.sharpe.toFixed(3));
+  setLabel("kpi-sharpe-label", `Sharpe · ${rn}`);
+  set("kpi-dd", w.drawdown == null ? "—" : `${w.drawdown.toFixed(2)}%`);
+  setLabel("kpi-dd-label", `Drawdown · ${rn}`);
   set("kpi-bt", `MAPE ${bt.model_mape}% vs naive ${bt.naive_mape}% — ${bt.verdict}`);
   document.getElementById("chart-title").textContent =
     `${payload.ticker} · ${payload.forecast.method} · next ${fd}d`;
@@ -156,6 +189,15 @@ function render(payload) {
   document.getElementById("ai-tag").textContent =
     `Forecast reliability: ${verdict} (model MAPE ${payload.backtest.model_mape}% vs naive ${payload.backtest.naive_mape}%)`;
   document.getElementById("live-insight").textContent = liveNarrative(payload, s);
+  {
+    const inWin = new Set(s.dates);
+    const nAn = (payload.anomalies || []).filter((a) => inWin.has(a.date)).length;
+    const fd = state.showFc ? Math.min(state.fcDays, payload.forecast.mean.length) : 0;
+    document.getElementById("ai-live").textContent =
+      `In this ${rangeName()} view: ${w.change == null ? "—" : `${w.change > 0 ? "+" : ""}${w.change.toFixed(1)}%`} ` +
+      `with ${nAn} anomal${nAn === 1 ? "y" : "ies"}${state.showFc ? `; showing ${fd} of ${payload.forecast.mean.length} forecast days` : "; forecast hidden"}. ` +
+      `The AI summary above covers full history.`;
+  }
   const ul = document.getElementById("anomaly-list");
   ul.innerHTML = "";
   const anomalies = payload.anomalies || [];
