@@ -14,8 +14,9 @@ let indexData = null;
 
 function nameOf(t) { return (typeof COMPANY_NAMES !== "undefined" && COMPANY_NAMES[t]) || t; }
 // Chart-friendly name: full company name without legal suffix / bracketed note.
-function chartName(t) {
-  return nameOf(t).replace(/\s*\(.*?\)\s*/g, " ").replace(/,?\s+(Inc\.?|Corporation|Corp\.?|Limited|Ltd\.?|plc|N\.V\.|Incorporated|Company|Co\.)$/i, "").trim();
+function chartName(t, short) {
+  const n = short ? nameOf(t).replace(/\s*\(.*?\)\s*/g, " ") : nameOf(t);
+  return n.replace(/,?\s+(Inc\.?|Corporation|Corp\.?|Limited|Ltd\.?|plc|N\.V\.|Incorporated|Company|Co\.)$/i, "").trim();
 }
 function labelOf(t) { const n = nameOf(t); return n === t ? t : `${n} (${t.replace(/\.NS$/, "")})`; }
 
@@ -665,7 +666,7 @@ function renderInsightCharts() {
         ctx.font = "11px system-ui, sans-serif";
         ctx.fillStyle = dark ? "#eef1f6" : "#1c1c28";
         const meta = c.getDatasetMeta(0);
-        meta.data.forEach((p, i) => { ctx.fillText(chartName(pts[i].t), p.x + 6, p.y - 6); });
+        meta.data.forEach((p, i) => { ctx.fillText(chartName(pts[i].t, true), p.x + 6, p.y - 6); });
         ctx.restore();
       },
     };
