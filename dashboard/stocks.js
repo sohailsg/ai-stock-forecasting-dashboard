@@ -614,8 +614,9 @@ function showError(err) {
   console.error(err);
   document.querySelector("main").innerHTML =
     `<div class="error-box"><strong>Could not load stock data.</strong><br>${err.message}<br><br>` +
-    `Run <code>uv run main.py</code> to generate <code>output/stocks/</code>, then serve via ` +
-    `<code>python -m http.server 8000</code> and open <code>/dashboard/stocks.html</code>.</div>`;
+    `Run <code>uv run main.py</code> to generate <code>output/stocks/</code>. ` +
+    `If you just updated the site, hard-refresh (<code>Ctrl+Shift+R</code>) — ` +
+    `your browser may be running cached code against the new page.</div>`;
 }
 
 init();
