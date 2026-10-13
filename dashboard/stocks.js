@@ -18,7 +18,22 @@ function chartName(t, short) {
   const n = short ? nameOf(t).replace(/\s*\(.*?\)\s*/g, " ") : nameOf(t);
   return n.replace(/,?\s+(Inc\.?|Corporation|Corp\.?|Limited|Ltd\.?|plc|N\.V\.|Incorporated|Company|Co\.)$/i, "").trim();
 }
-function labelOf(t) { const n = nameOf(t); return n === t ? t : `${n} (${t.replace(/\.NS$/, "")})`; }
+function labelOf(t) { return nameOf(t); }
+
+// Replace ticker codes inside free text (e.g. build-time AI summaries) with full names.
+let _tickerRe = null;
+function expandTickers(text) {
+  if (!text || typeof COMPANY_NAMES === "undefined") return text;
+  if (!_tickerRe) {
+    const codes = Object.keys(COMPANY_NAMES).map((t) => t.replace(/\.NS$/, ""))
+      .filter((c) => c.length >= 3 && /^[A-Z0-9&-]+$/.test(c)).sort((a, b) => b.length - a.length)
+      .map((c) => c.replace(/[&-]/g, "\\$&"));
+    _tickerRe = new RegExp("\\b(" + codes.join("|") + ")(?:\\.NS)?(?![A-Za-z0-9])", "g");
+  }
+  const byCode = {};
+  Object.keys(COMPANY_NAMES).forEach((t) => { byCode[t.replace(/\.NS$/, "")] = COMPANY_NAMES[t]; });
+  return text.replace(_tickerRe, (m, c) => byCode[c] || m);
+}
 
 function symOf(t) {
   const code = (indexData.snapshot && indexData.snapshot[t] && indexData.snapshot[t].currency)
@@ -191,10 +206,10 @@ function render(payload) {
   const conf = confidence(bt);
   set("kpi-bt", bt && bt.model_mape != null ? `${conf.level} · ±${bt.model_mape}%` : "—");
   document.getElementById("chart-title").textContent =
-    `${nameOf(payload.ticker)} (${payload.ticker}) · ${payload.forecast.method} · next ${fd}d`;
+    `${nameOf(payload.ticker)} · ${payload.forecast.method} · next ${fd}d`;
   const longRun = (indexData.insights && indexData.insights[payload.ticker]) || "";
   document.getElementById("ai-insight").textContent =
-    (liveInsight(payload, s, windowStats(s.close)) + (longRun ? ` Long-run view: ${longRun}` : "")) || "No insight available.";
+    expandTickers(liveInsight(payload, s, windowStats(s.close)) + (longRun ? ` Long-run view: ${longRun}` : "")) || "No insight available.";
   document.getElementById("ai-tag").textContent = `Forecast confidence: ${conf.level} — ${conf.text}`;
   document.getElementById("live-insight").textContent = liveNarrative(payload, s);
   {
@@ -300,7 +315,7 @@ function liveNarrative(payload, s) {
     const fPct = ((fLast / last - 1) * 100);
     fcBit = `the model stretches the trend ${fd} days to ${sym}${fLast.toLocaleString()} (${fPct >= 0 ? "+" : ""}${fPct.toFixed(1)}%), and its track record is ${plainVerdict(payload.backtest)}`;
   }
-  return `You're looking at ${nameOf(t)} [${t}] (${sectorOf(t)}) over the last ${days} trading days: ` +
+  return `You're looking at ${nameOf(t)} (${sectorOf(t)}) over the last ${days} trading days: ` +
     `${sym}${first.toLocaleString()} → ${sym}${last.toLocaleString()} (${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%). ` +
     (maBits.length ? `Against trend lines: ${maBits.join("; ")}.` : "") +
     ` Ahead: ${fcBit}.`;
@@ -409,7 +424,7 @@ function industryInsight() {
 }
 
 function renderMarket() {
-  document.getElementById("market-insight").textContent = industryInsight();
+  document.getElementById("market-insight").textContent = expandTickers(industryInsight());
   const mh = document.getElementById("market-tag");
   if (mh) mh.textContent = `(${activeSector() || "all"} industry — ${inView().length} companies)`;
   // Sector cards: average 1M change per sector
