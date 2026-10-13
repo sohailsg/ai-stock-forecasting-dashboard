@@ -13,6 +13,10 @@ let cache = {};
 let indexData = null;
 
 function nameOf(t) { return (typeof COMPANY_NAMES !== "undefined" && COMPANY_NAMES[t]) || t; }
+// Chart-friendly name: full company name without legal suffix / bracketed note.
+function chartName(t) {
+  return nameOf(t).replace(/\s*\(.*?\)\s*/g, " ").replace(/,?\s+(Inc\.?|Corporation|Corp\.?|Limited|Ltd\.?|plc|N\.V\.|Incorporated|Company|Co\.)$/i, "").trim();
+}
 function labelOf(t) { const n = nameOf(t); return n === t ? t : `${n} (${t.replace(/\.NS$/, "")})`; }
 
 function symOf(t) {
@@ -454,7 +458,7 @@ function renderMarket() {
   rows.forEach(([t, v], i) => {
     const tr = document.createElement("tr");
     if (t === state.ticker) tr.className = "me";
-    tr.innerHTML = `<td>${i + 1}</td><td><a href="#" data-goto="${t}"><strong>${nameOf(t)}</strong> <small>${t.replace(/\.NS$/, "")}</small></a></td>` +
+    tr.innerHTML = `<td>${i + 1}</td><td><a href="#" data-goto="${t}"><strong>${nameOf(t)}</strong></a></td>` +
       `<td>${v.sector || sectorOf(t)}</td>` +
       `<td style="text-align:right">${v.change_1m > 0 ? "+" : ""}${v.change_1m}%</td>` +
       `<td style="text-align:right">${v.volatility ?? "—"}</td>` +
@@ -521,7 +525,7 @@ async function updateCompare() {
   const datasets = picks.map((t, i) => {
     const base = maps[i].get(tail[0]);
     return {
-      label: t,
+      label: nameOf(t),
       data: tail.map((d) => {
         const v = maps[i].get(d);
         return v != null && base ? +(v / base * 100).toFixed(2) : null;
@@ -635,7 +639,7 @@ function renderInsightCharts() {
   {
     const sorted = [...rows].sort((a, b) => a[1].change_1m - b[1].change_1m);
     fitHeight("chart-perf", sorted.length);
-    const labels = sorted.map(([t]) => t + (isBench(t) ? " ★" : ""));
+    const labels = sorted.map(([t]) => chartName(t) + (isBench(t) ? " ★" : ""));
     insightCharts.push(new Chart(document.getElementById("chart-perf"), {
       type: "bar",
       data: { labels, datasets: [{ data: sorted.map(([, v]) => v.change_1m),
@@ -661,7 +665,7 @@ function renderInsightCharts() {
         ctx.font = "11px system-ui, sans-serif";
         ctx.fillStyle = dark ? "#eef1f6" : "#1c1c28";
         const meta = c.getDatasetMeta(0);
-        meta.data.forEach((p, i) => { ctx.fillText(pts[i].t, p.x + 6, p.y - 6); });
+        meta.data.forEach((p, i) => { ctx.fillText(chartName(pts[i].t), p.x + 6, p.y - 6); });
         ctx.restore();
       },
     };
@@ -688,7 +692,7 @@ function renderInsightCharts() {
     fitHeight("chart-high", sorted.length);
     insightCharts.push(new Chart(document.getElementById("chart-high"), {
       type: "bar",
-      data: { labels: sorted.map(([t]) => t + (isBench(t) ? " ★" : "")),
+      data: { labels: sorted.map(([t]) => chartName(t) + (isBench(t) ? " ★" : "")),
         datasets: [{ data: sorted.map(([, v]) => v.pct_off_high),
           backgroundColor: sorted.map(([, v]) => (v.pct_off_high > -10 ? up : down)), borderRadius: 4 }] },
       options: { indexAxis: "y", responsive: true, maintainAspectRatio: false,
@@ -708,7 +712,7 @@ function renderInsightCharts() {
     fitHeight("chart-trend", sorted.length);
     insightCharts.push(new Chart(document.getElementById("chart-trend"), {
       type: "bar",
-      data: { labels: sorted.map(([t]) => t + (isBench(t) ? " ★" : "")),
+      data: { labels: sorted.map(([t]) => chartName(t) + (isBench(t) ? " ★" : "")),
         datasets: [{ data: sorted.map(([, v]) => v.dist_ma50_pct),
           backgroundColor: sorted.map(([, v]) => (v.dist_ma50_pct >= 0 ? up : down)), borderRadius: 4 }] },
       options: { indexAxis: "y", responsive: true, maintainAspectRatio: false,
