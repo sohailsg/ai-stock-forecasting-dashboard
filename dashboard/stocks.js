@@ -12,6 +12,9 @@ const state = { ticker: "", range: 365, showMA20: true, showMA50: true, showFc: 
 let cache = {};
 let indexData = null;
 
+function nameOf(t) { return (typeof COMPANY_NAMES !== "undefined" && COMPANY_NAMES[t]) || t; }
+function labelOf(t) { const n = nameOf(t); return n === t ? t : `${n} (${t.replace(/\.NS$/, "")})`; }
+
 function symOf(t) {
   const code = (indexData.snapshot && indexData.snapshot[t] && indexData.snapshot[t].currency)
     || (cache[t] && cache[t].currency) || "USD";
@@ -183,7 +186,7 @@ function render(payload) {
   const conf = confidence(bt);
   set("kpi-bt", bt && bt.model_mape != null ? `${conf.level} · ±${bt.model_mape}%` : "—");
   document.getElementById("chart-title").textContent =
-    `${payload.ticker} · ${payload.forecast.method} · next ${fd}d`;
+    `${nameOf(payload.ticker)} (${payload.ticker}) · ${payload.forecast.method} · next ${fd}d`;
   const longRun = (indexData.insights && indexData.insights[payload.ticker]) || "";
   document.getElementById("ai-insight").textContent =
     (liveInsight(payload, s, windowStats(s.close)) + (longRun ? ` Long-run view: ${longRun}` : "")) || "No insight available.";
@@ -265,7 +268,7 @@ function liveInsight(payload, s, w) {
   const sh = w.sharpe == null ? "" : w.sharpe > 1 ? "the return was well worth the risk" : w.sharpe > 0 ? "the return only just paid for the risk" : "the risk was not rewarded";
   const inWin = new Set(s.dates);
   const nAn = (payload.anomalies || []).filter((a) => inWin.has(a.date)).length;
-  return `Over the ${rn} view, ${payload.ticker} ${dir} ${Math.abs(w.change).toFixed(1)}% — ${volWord || "volatility n/a"}` +
+  return `Over the ${rn} view, ${nameOf(payload.ticker)} ${dir} ${Math.abs(w.change).toFixed(1)}% — ${volWord || "volatility n/a"}` +
     `${sh ? `; ${sh}` : ""}. Worst fall from a peak was ${w.drawdown.toFixed(1)}%. ` +
     `Price is ${sym}${last.toLocaleString()}: ${Math.abs(offHigh).toFixed(1)}% below the ${rn} high, ${abovelow.toFixed(1)}% above the low. ` +
     `${nAn} unusual day${nAn === 1 ? "" : "s"} flagged in this window.`;
@@ -289,7 +292,7 @@ function liveNarrative(payload, s) {
     const fPct = ((fLast / last - 1) * 100);
     fcBit = `the model stretches the trend ${fd} days to ${sym}${fLast.toLocaleString()} (${fPct >= 0 ? "+" : ""}${fPct.toFixed(1)}%), and its track record is ${plainVerdict(payload.backtest)}`;
   }
-  return `You're looking at ${t} (${sectorOf(t)}) over the last ${days} trading days: ` +
+  return `You're looking at ${nameOf(t)} [${t}] (${sectorOf(t)}) over the last ${days} trading days: ` +
     `${sym}${first.toLocaleString()} → ${sym}${last.toLocaleString()} (${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%). ` +
     (maBits.length ? `Against trend lines: ${maBits.join("; ")}.` : "") +
     ` Ahead: ${fcBit}.`;
@@ -310,7 +313,7 @@ function compareNarrative() {
     });
   if (rows.length < 2) {
     el.textContent = rows.length
-      ? `${rows[0].t}: ${rows[0].chg >= 0 ? "+" : ""}${rows[0].chg.toFixed(1)}% over this stretch. Pick a second stock to compare.`
+      ? `${nameOf(rows[0].t)}: ${rows[0].chg >= 0 ? "+" : ""}${rows[0].chg.toFixed(1)}% over this stretch. Pick a second stock to compare.`
       : "";
     return;
   }
@@ -319,10 +322,10 @@ function compareNarrative() {
   const lose = rest[rest.length - 1];
   const calm = [...rows].sort((a, b) => (a.vol ?? 9) - (b.vol ?? 9))[0];
   el.textContent =
-    `${win.t} grew most here (${win.chg >= 0 ? "+" : ""}${win.chg.toFixed(1)}%) while ` +
-    `${lose.t} trailed (${lose.chg >= 0 ? "+" : ""}${lose.chg.toFixed(1)}%). ` +
-    `Calmest ride: ${calm.t} (volatility ${calm.vol ?? "—"}). ` +
-    `On forecast honesty: ${rows.map((r) => `${r.t} is ${r.verdict || "unrated"}`).join("; ")}. ` +
+    `${nameOf(win.t)} grew most here (${win.chg >= 0 ? "+" : ""}${win.chg.toFixed(1)}%) while ` +
+    `${nameOf(lose.t)} trailed (${lose.chg >= 0 ? "+" : ""}${lose.chg.toFixed(1)}%). ` +
+    `Calmest ride: ${nameOf(calm.t)} (volatility ${calm.vol ?? "—"}). ` +
+    `On forecast honesty: ${rows.map((r) => `${nameOf(r.t)} is ${r.verdict || "unrated"}`).join("; ")}. ` +
     `Educational comparison only — not advice.`;
 }
 
@@ -357,7 +360,7 @@ function buildTickerOptions() {
   const groups = {};
   indexData.tickers.forEach((t) => {
     if (state.sector && sectorOf(t) !== state.sector) return;
-    if (state.q && !t.toLowerCase().includes(state.q)) return;
+    if (state.q && !(t + " " + nameOf(t)).toLowerCase().includes(state.q)) return;
     (groups[sectorOf(t)] = groups[sectorOf(t)] || []).push(t);
   });
   Object.keys(groups).sort().forEach((g) => {
@@ -365,7 +368,7 @@ function buildTickerOptions() {
     og.label = g;
     groups[g].forEach((t) => {
       const o = document.createElement("option");
-      o.value = o.textContent = t;
+      o.value = t; o.textContent = labelOf(t);
       og.appendChild(o);
     });
     sel.appendChild(og);
@@ -426,7 +429,7 @@ function renderMarket() {
   rows.forEach(([t, v], i) => {
     const tr = document.createElement("tr");
     if (t === state.ticker) tr.className = "me";
-    tr.innerHTML = `<td>${i + 1}</td><td><a href="#" data-goto="${t}"><strong>${t}</strong></a></td>` +
+    tr.innerHTML = `<td>${i + 1}</td><td><a href="#" data-goto="${t}"><strong>${nameOf(t)}</strong> <small>${t.replace(/\.NS$/, "")}</small></a></td>` +
       `<td>${v.sector || sectorOf(t)}</td>` +
       `<td style="text-align:right">${v.change_1m > 0 ? "+" : ""}${v.change_1m}%</td>` +
       `<td style="text-align:right">${v.volatility ?? "—"}</td>` +
@@ -461,7 +464,7 @@ function renderCmpPicks() {
       writeHash();
       updateCompare().catch((e) => console.error(e));
     });
-    lab.append(cb, document.createTextNode(` ${t}`));
+    lab.append(cb, document.createTextNode(` ${labelOf(t)}`));
     wrap.appendChild(lab);
   });
 }
@@ -622,7 +625,7 @@ function renderInsightCharts() {
         pointRadius: 6, pointHoverRadius: 8 }] },
       options: { responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: false },
-          tooltip: { callbacks: { label: (c) => ` ${c.raw.t}: ${c.raw.y > 0 ? "+" : ""}${c.raw.y}% return, ${c.raw.x} vol` } } },
+          tooltip: { callbacks: { label: (c) => ` ${nameOf(c.raw.t)}: ${c.raw.y > 0 ? "+" : ""}${c.raw.y}% return, ${c.raw.x} vol` } } },
         scales: {
           x: { title: { display: true, text: "Risk — annualized volatility (σ)" } },
           y: { title: { display: true, text: "Reward — return, last 30 days (%)" } },
