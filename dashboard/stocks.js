@@ -456,10 +456,16 @@ function renderInsightCharts() {
   const up = dark ? "#5fd6b5" : "#1e9e6a";
   const down = "#e63946";
   const gray = "#9aa4b2";
+  // Tall bars stay readable: ~30px per row for the horizontal bar charts
+  const fitHeight = (id, n) => {
+    document.getElementById(id).parentElement.style.height =
+      `${Math.max(340, Math.min(n, 45) * 30)}px`;
+  };
 
   // 1. Who's winning? — 1M return bars, sorted
   {
     const sorted = [...rows].sort((a, b) => a[1].change_1m - b[1].change_1m);
+    fitHeight("chart-perf", sorted.length);
     const labels = sorted.map(([t]) => t + (isBench(t) ? " ★" : ""));
     insightCharts.push(new Chart(document.getElementById("chart-perf"), {
       type: "bar",
@@ -510,6 +516,7 @@ function renderInsightCharts() {
   {
     const sorted = rows.filter(([, v]) => v.pct_off_high != null)
       .sort((a, b) => a[1].pct_off_high - b[1].pct_off_high);
+    fitHeight("chart-high", sorted.length);
     insightCharts.push(new Chart(document.getElementById("chart-high"), {
       type: "bar",
       data: { labels: sorted.map(([t]) => t + (isBench(t) ? " ★" : "")),
@@ -529,6 +536,7 @@ function renderInsightCharts() {
   {
     const sorted = rows.filter(([, v]) => v.dist_ma50_pct != null)
       .sort((a, b) => a[1].dist_ma50_pct - b[1].dist_ma50_pct);
+    fitHeight("chart-trend", sorted.length);
     insightCharts.push(new Chart(document.getElementById("chart-trend"), {
       type: "bar",
       data: { labels: sorted.map(([t]) => t + (isBench(t) ? " ★" : "")),

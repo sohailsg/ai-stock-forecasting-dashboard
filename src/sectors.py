@@ -1,20 +1,26 @@
 """sectors.py — ticker universe grouped by industry (US + India + benchmarks).
 
-Analyst coverage: mega-cap leaders in each major sector so cross-industry
-comparison is meaningful, plus home-market benchmarks for relative strength.
+Analyst coverage: leaders in every major sector of both markets so
+cross-industry comparison is meaningful, plus home-market benchmarks
+for relative strength.
 """
 
 from __future__ import annotations
 
 SECTORS: dict[str, list[str]] = {
-    "Technology": ["AAPL", "MSFT", "GOOGL"],
+    "Technology": ["AAPL", "MSFT"],
+    "Communication": ["GOOGL", "META", "NFLX"],
     "Semiconductors": ["NVDA", "AVGO", "AMD"],
-    "EV & Auto": ["TSLA", "MARUTI.NS"],
-    "Financials": ["JPM", "V", "HDFCBANK.NS", "ICICIBANK.NS"],
-    "Healthcare": ["JNJ", "LLY"],
-    "Consumer": ["AMZN", "WMT"],
+    "EV & Auto": ["TSLA", "F", "GM", "MARUTI.NS", "M&M.NS"],
+    "Financials": ["JPM", "V", "BAC", "HDFCBANK.NS", "ICICIBANK.NS", "SBIN.NS"],
+    "Healthcare": ["JNJ", "LLY", "UNH"],
+    "Consumer": ["AMZN", "WMT", "COST", "HINDUNILVR.NS", "TITAN.NS"],
     "Energy": ["XOM", "CVX", "RELIANCE.NS"],
-    "India IT": ["TCS.NS", "INFY.NS"],
+    "Industrials": ["CAT", "UNP"],
+    "Utilities": ["NEE"],
+    "Real Estate": ["AMT"],
+    "India IT": ["TCS.NS", "INFY.NS", "WIPRO.NS"],
+    "India Pharma": ["SUNPHARMA.NS"],
     "Benchmark": ["^GSPC", "^NSEI"],
 }
 

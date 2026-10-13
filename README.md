@@ -5,12 +5,14 @@ Live: **https://sohail-ahmed.space/**
 > Educational only, not financial advice. Market data: Yahoo Finance via
 > yfinance (unofficial).
 
-Interactive stock analytics for 23 US + India stocks and indexes across 9 industries
-(tech, chips, EV, finance, healthcare, consumer, energy, India IT/bank/energy):
-daily fetch → MA20/50, volatility, Sharpe, drawdown → ARIMA(1,1,1) 30-day
-forecast with 95% band → honest backtest vs naive → z-score anomalies →
-Gemini insights + market overview → Chart.js UI with sector filter, search,
-compare mode (rebased), correlation heatmap and ranking table →
+Interactive stock analytics for 40 US + India stocks and indexes across 14 industries
+(tech, communication, chips, EV/auto, finance, healthcare, consumer, energy,
+industrials, utilities, real estate, India IT/pharma) plus S&P 500 and
+Nifty 50 benchmarks:
+daily fetch → MA20/50, volatility, Sharpe, drawdown, 52-week position →
+ARIMA(1,1,1) 30-day forecast with 95% band → honest backtest vs naive →
+z-score anomalies → Gemini insights + market overview → Chart.js UI with
+industry-first flow, compare mode (rebased), diversification pairs and ranking →
 GitHub Pages auto-deploy with weekday refresh.
 
 Docs: `docs/architecture.md`, `docs/forecasting.md`, `docs/deployment.md`,
@@ -28,7 +30,7 @@ uv run main.py
 python -m http.server 8000   # open http://localhost:8000/dashboard/
 ```
 
-Env: `TICKERS` (default 23 US+India industry set, see `src/sectors.py`),
+Env: `TICKERS` (default 40 US+India industry set, see `src/sectors.py`),
 `FORECAST_HORIZON` (default 30), `GEMINI_API_KEY`.
 
 ---
@@ -61,7 +63,7 @@ Env: `TICKERS` (default 23 US+India industry set, see `src/sectors.py`),
 
 ## Features
 
-- **23 stocks, indexes, 9 industries:** US tech/chips/EV/finance/health/consumer/energy + India IT/bank/energy/auto + S&P 500 & Nifty 50 benchmarks
+- **40 stocks, indexes, 14 industries** + S&P 500 & Nifty 50 benchmarks
 - **Forecasts with honesty:** every ticker shows model MAPE vs naive MAPE + verdict
 - **Compare mode:** overlay up to 3 tickers rebased to 100, shareable via URL hash
 - **Correlation heatmap:** click a cell to compare that pair
