@@ -66,12 +66,12 @@
     </section>
 
     <section class="kpi-cards" aria-label="Key metrics" aria-live="polite">
-      <div class="card" title="Latest closing price (every view ends today)"><h2>Last close</h2><p class="kpi-value loading" id="kpi-close">—</p></div>
+      <div class="card" title="Latest price. Doesn't change with the range, because every range ends today."><h2>Last close</h2><p class="kpi-value loading" id="kpi-close">—</p></div>
       <div class="card" title="Price change across the history range you picked above"><h2 id="kpi-chg-label">1M change</h2><p class="kpi-value loading" id="kpi-chg">—</p></div>
       <div class="card" title="How much the price swung inside your selected range, scaled to a year. Higher = bumpier ride."><h2 id="kpi-vol-label">Volatility</h2><p class="kpi-value loading" id="kpi-vol">—</p></div>
       <div class="card" title="Return per unit of risk inside your selected range. Above 1 is strong, below 0 means the ride wasn't worth it."><h2 id="kpi-sharpe-label">Sharpe</h2><p class="kpi-value loading" id="kpi-sharpe">—</p></div>
       <div class="card" title="Worst peak-to-trough fall inside your selected range."><h2 id="kpi-dd-label">Max drawdown</h2><p class="kpi-value loading" id="kpi-dd">—</p></div>
-      <div class="card" title="Did our forecast model beat simply repeating today's price? MAPE = average % error."><h2>Backtest</h2><p class="kpi-value loading" id="kpi-bt" style="font-size:.95rem">—</p></div>
+      <div class="card" title="How much to trust the forecast: we replay the last 30 days and see how far off it would have been."><h2>Forecast confidence</h2><p class="kpi-value loading" id="kpi-bt" style="font-size:.95rem">—</p></div>
     </section>
 
     <section class="chart-section" aria-label="Price chart">
@@ -82,10 +82,7 @@
         <summary style="cursor:pointer;font-weight:600">How the forecast works (plain English)</summary>
         <p style="margin-top:.5rem;font-size:.9rem">We fit a classic time-series model (ARIMA) to past prices and extend the
         trend 30 business days out; the shaded band is the 95% confidence interval — wider means less sure.
-        It cannot predict news, results or events. The <strong>backtest</strong> replays history: we hide the last
-        30 days, forecast them, and measure the average % error (<strong>MAPE</strong>) against both our model and a
-        naive "tomorrow = today" guess. <strong>Beats naive</strong> = worth a look · <strong>comparable</strong> =
-        no better than guessing · <strong>worse than naive</strong> = ignore the projection.</p>
+        It cannot predict news, results or events. To judge trust, we replay history: hide the last 30 days, forecast them, and measure how far off we were. <strong>High</strong> = clearly better than assuming tomorrow equals today · <strong>Medium</strong> = about the same as that guess · <strong>Low</strong> = ignore the projection.</p>
       </details>
     </section>
 
@@ -165,8 +162,8 @@
         <li><strong>Max drawdown</strong> — worst peak-to-trough fall. Your worst-case history lesson.</li>
         <li><strong>MA20 / MA50</strong> — the average price over the last 20 trading days (about a month) / 50 days (about 2½ months). Think of them as the market's memory: price trading <em>above</em> its average means buyers have been in charge lately; <em>below</em> means sellers are.</li>
         <li><strong>52-week high</strong> — highest price in a year. Far below it can mean a dip — or a reason.</li>
-        <li><strong>MAPE</strong> — average % the forecast was off in backtests. Lower is better.</li>
-        <li><strong>The "naive guess"</strong> — the dumbest possible forecast: tomorrow's price = today's price. Every model must beat it to earn your trust. <strong>Beats naive</strong> = our model's error was clearly smaller · <strong>comparable</strong> = no better than the dumb guess · <strong>worse than naive</strong> = decoration, ignore the projection.</li>
+        <li><strong>Typical miss (±%)</strong> — average % the forecast was off when replayed on the last 30 days. Lower is better.</li>
+        <li><strong>Forecast confidence</strong> — how far off the forecast would have been on the last 30 days. <strong>High</strong> = beats the simple guess "tomorrow = today" · <strong>Medium</strong> = no better · <strong>Low</strong> = ignore the projection.</li>
         <li><strong>Anomaly (z-score)</strong> — a daily move so big (&gt;3 standard deviations) it stands out from the last 60 days.</li>
         <li><strong>Correlation</strong> — do two stocks move together? 1.0 = lockstep, 0 = independent. Low pairs diversify you.</li>
       </ul>
@@ -181,7 +178,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="theme.js"></script>
-  <script src="stocks.js"></script>
+  <script src="stocks.js?v=20261014b"></script>
 
 </body>
 </html>

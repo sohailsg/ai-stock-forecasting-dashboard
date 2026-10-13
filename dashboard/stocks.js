@@ -180,14 +180,14 @@ function render(payload) {
   setLabel("kpi-sharpe-label", `Sharpe · ${rn}`);
   set("kpi-dd", w.drawdown == null ? "—" : `${w.drawdown.toFixed(2)}%`);
   setLabel("kpi-dd-label", `Drawdown · ${rn}`);
-  set("kpi-bt", `MAPE ${bt.model_mape}% vs naive ${bt.naive_mape}% — ${bt.verdict}`);
+  const conf = confidence(bt);
+  set("kpi-bt", bt && bt.model_mape != null ? `${conf.level} · ±${bt.model_mape}%` : "—");
   document.getElementById("chart-title").textContent =
     `${payload.ticker} · ${payload.forecast.method} · next ${fd}d`;
+  const longRun = (indexData.insights && indexData.insights[payload.ticker]) || "";
   document.getElementById("ai-insight").textContent =
-    (indexData.insights && indexData.insights[payload.ticker]) || "No insight available.";
-  const verdict = (payload.backtest || {}).verdict || "unknown";
-  document.getElementById("ai-tag").textContent =
-    `Forecast reliability: ${verdict} (model MAPE ${payload.backtest.model_mape}% vs naive ${payload.backtest.naive_mape}%)`;
+    (liveInsight(payload, s, windowStats(s.close)) + (longRun ? ` Long-run view: ${longRun}` : "")) || "No insight available.";
+  document.getElementById("ai-tag").textContent = `Forecast confidence: ${conf.level} — ${conf.text}`;
   document.getElementById("live-insight").textContent = liveNarrative(payload, s);
   {
     const inWin = new Set(s.dates);
@@ -196,7 +196,7 @@ function render(payload) {
     document.getElementById("ai-live").textContent =
       `In this ${rangeName()} view: ${w.change == null ? "—" : `${w.change > 0 ? "+" : ""}${w.change.toFixed(1)}%`} ` +
       `with ${nAn} anomal${nAn === 1 ? "y" : "ies"}${state.showFc ? `; showing ${fd} of ${payload.forecast.mean.length} forecast days` : "; forecast hidden"}. ` +
-      `The AI summary above covers full history.`;
+      ``;
   }
   const ul = document.getElementById("anomaly-list");
   ul.innerHTML = "";
@@ -243,13 +243,32 @@ function currentPNG() {
    Plain-language, data-driven commentary. Moves with ticker, range,
    horizon and compare picks — nothing hardcoded. */
 
-function plainVerdict(bt) {
-  if (!bt || bt.model_mape == null || bt.naive_mape == null) return "not enough history to judge";
-  if (bt.verdict === "beats naive")
-    return `beating the dumb guess (off by ${bt.model_mape}% vs ${bt.naive_mape}%)`;
-  if (bt.verdict === "comparable")
-    return `no better than the dumb guess (${bt.model_mape}% vs ${bt.naive_mape}%)`;
-  return `losing to the dumb guess (${bt.model_mape}% vs ${bt.naive_mape}%) — decoration`;
+function confidence(bt) {
+  if (!bt || bt.model_mape == null) return { level: "Unknown", text: "not enough history to judge" };
+  const miss = `typically off by ~${bt.model_mape}% when replayed on the last 30 days`;
+  if (bt.verdict === "beats naive") return { level: "High", text: `reasonably reliable (${miss})` };
+  if (bt.verdict === "comparable") return { level: "Medium", text: `no better than assuming tomorrow equals today (${miss})` };
+  return { level: "Low", text: `weak, treat the projection as decoration (${miss})` };
+}
+
+function plainVerdict(bt) { return confidence(bt).text; }
+
+function liveInsight(payload, s, w) {
+  if (!w || w.change == null) return "";
+  const sym = symOf(payload.ticker), rn = rangeName();
+  const closes = s.close.filter((v) => v != null);
+  const hi = Math.max(...closes), lo = Math.min(...closes), last = w.last;
+  const offHigh = (last / hi - 1) * 100, abovelow = (last / lo - 1) * 100;
+  const dir = w.change >= 0 ? "gained" : "lost";
+  const vol = w.volatility == null ? null : w.volatility;
+  const volWord = vol == null ? "" : vol < 0.2 ? "a calm ride" : vol < 0.35 ? "a moderately bumpy ride" : "a rollercoaster";
+  const sh = w.sharpe == null ? "" : w.sharpe > 1 ? "the return was well worth the risk" : w.sharpe > 0 ? "the return only just paid for the risk" : "the risk was not rewarded";
+  const inWin = new Set(s.dates);
+  const nAn = (payload.anomalies || []).filter((a) => inWin.has(a.date)).length;
+  return `Over the ${rn} view, ${payload.ticker} ${dir} ${Math.abs(w.change).toFixed(1)}% — ${volWord || "volatility n/a"}` +
+    `${sh ? `; ${sh}` : ""}. Worst fall from a peak was ${w.drawdown.toFixed(1)}%. ` +
+    `Price is ${sym}${last.toLocaleString()}: ${Math.abs(offHigh).toFixed(1)}% below the ${rn} high, ${abovelow.toFixed(1)}% above the low. ` +
+    `${nAn} unusual day${nAn === 1 ? "" : "s"} flagged in this window.`;
 }
 
 function liveNarrative(payload, s) {
