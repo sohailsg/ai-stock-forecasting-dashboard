@@ -33,8 +33,9 @@ def get_sector(ticker: str) -> str:
 
 
 def get_currency(ticker: str) -> str:
-    """ISO currency code: INR for NSE (.NS) listings, USD otherwise."""
-    if ticker.upper().endswith(".NS"):
+    """ISO currency code: INR for NSE (.NS) listings and Nifty 50, USD otherwise."""
+    upper = ticker.upper()
+    if upper.endswith(".NS") or upper == "^NSEI":
         return "INR"
     return "USD"
 

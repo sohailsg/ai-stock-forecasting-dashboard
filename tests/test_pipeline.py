@@ -101,6 +101,7 @@ def test_sector_universe_is_us_india():
     assert sec.get_sector("^NSEI") == "Benchmark"
     assert sec.get_sector("UNKNOWN.X") == "Other"
     assert sec.get_currency("INFY.NS") == "INR"
+    assert sec.get_currency("^NSEI") == "INR"
     assert sec.get_currency("MSFT") == "USD"
 
 
