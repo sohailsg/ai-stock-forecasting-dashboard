@@ -211,7 +211,10 @@ function render(payload) {
     li.textContent = `${a.date}: ${s}${a.price} (${a.return_pct > 0 ? "+" : ""}${a.return_pct}%, z=${a.z})`;
     ul.appendChild(li);
   });
-  if (indexData.snapshot) renderMarket();
+  if (indexData.snapshot) {
+    renderMarket();
+    if (state._chartSector !== activeSector()) { state._chartSector = activeSector(); renderInsightCharts(); }
+  }
 }
 
 function currentCSV() {
@@ -350,6 +353,9 @@ async function selectTicker(t) {
 
 /* ── Sectors, search, market overview, ranking ─────────────────────────── */
 
+// Industry in focus: the one picked in the filter, else the inspected stock's own.
+function activeSector() { return state.sector || (state.ticker ? sectorOf(state.ticker) : ""); }
+
 function sectorOf(t) {
   return (indexData.sectors && indexData.sectors[t]) || "Other";
 }
@@ -383,9 +389,24 @@ function verdictClass(v) {
   return v === "beats naive" ? "verdict-beats" : (v === "worse than naive" ? "verdict-worse" : "");
 }
 
+function industryInsight() {
+  const rows = inView();
+  const sec = activeSector();
+  if (rows.length < 2) return `${sec}: not enough companies with data to read this industry.`;
+  const by = [...rows].sort((a, b) => b[1].change_1m - a[1].change_1m);
+  const avg = rows.reduce((a, [, v]) => a + v.change_1m, 0) / rows.length;
+  const up = rows.filter(([, v]) => v.change_1m > 0).length;
+  const volRows = rows.filter(([, v]) => v.volatility != null).sort((a, b) => b[1].volatility - a[1].volatility);
+  const f = (x) => `${x > 0 ? "+" : ""}${x.toFixed(1)}%`;
+  return `${sec} industry, last month: ${up} of ${rows.length} companies rose, average move ${f(avg)}. ` +
+    `Best: ${nameOf(by[0][0])} (${f(by[0][1].change_1m)}); weakest: ${nameOf(by[by.length - 1][0])} (${f(by[by.length - 1][1].change_1m)}).` +
+    (volRows.length ? ` Bumpiest ride: ${nameOf(volRows[0][0])} (volatility ${volRows[0][1].volatility}).` : "");
+}
+
 function renderMarket() {
-  document.getElementById("market-insight").textContent =
-    indexData.market_insight || "Market overview unavailable.";
+  document.getElementById("market-insight").textContent = industryInsight();
+  const mh = document.getElementById("market-tag");
+  if (mh) mh.textContent = `(${activeSector() || "all"} industry — ${inView().length} companies)`;
   // Sector cards: average 1M change per sector
   const snap = indexData.snapshot || {};
   const bySec = {};
@@ -426,7 +447,7 @@ function renderMarket() {
   // Ranking table by 1M change
   const rows = Object.entries(snap)
     .filter(([, v]) => v.change_1m != null)
-    .filter(([t, v]) => !state.sector || (v.sector || sectorOf(t)) === state.sector)
+    .filter(([t, v]) => (v.sector || sectorOf(t)) === activeSector())
     .sort((a, b) => b[1].change_1m - a[1].change_1m);
   const tb = document.querySelector("#rank-table tbody");
   tb.innerHTML = "";
@@ -455,7 +476,7 @@ const CMP_COLORS = ["#4361ee", "#e63946", "#43aa8b"];
 function renderCmpPicks() {
   const wrap = document.getElementById("cmp-picks");
   wrap.innerHTML = "";
-  indexData.tickers.filter((t) => !state.sector || sectorOf(t) === state.sector || state.cmp.includes(t)).forEach((t) => {
+  indexData.tickers.filter((t) => sectorOf(t) === activeSector() || state.cmp.includes(t)).forEach((t) => {
     const lab = document.createElement("label");
     lab.className = "pill";
     const cb = document.createElement("input");
@@ -584,7 +605,7 @@ function inView() {
   // Stocks currently in view (sector filter applies; benchmarks marked ★)
   return Object.entries(indexData.snapshot || {})
     .filter(([, v]) => v.change_1m != null)
-    .filter(([t]) => !state.sector || (indexData.snapshot[t].sector || sectorOf(t)) === state.sector);
+    .filter(([t]) => (indexData.snapshot[t].sector || sectorOf(t)) === activeSector());
 }
 
 function killInsights() {
