@@ -8,6 +8,7 @@ Merges result into output/stocks/index.json -> insights.
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import logging
 import os
@@ -138,9 +139,9 @@ def _market_via_gemini(client, snapshot: dict) -> str:
     """One short call: 3-sentence cross-sector market overview, no advice."""
     prompt = (
         "You are a cautious market-data commentator. Given this snapshot of "
-        "stocks grouped by sector (1-month change %, volatility, backtest verdict "
-        "vs naive), write exactly 3 plain-English sentences: which sectors led "
-        "and lagged, how trustworthy the statistical forecasts look overall, "
+        "stocks grouped by sector (1-month change %, volatility, forecast verdict), "
+        "write exactly 3 plain-English sentences: which sectors led "
+        "and lagged, what that suggests about the market mood, "
         "and one caution. No buy/sell advice, no recommendations, no guarantees. "
         "Plain text only.\n\n" + json.dumps(snapshot)
     )
@@ -172,6 +173,122 @@ def _parse_json_response(text: str) -> dict:
         return {}
 
 
+NEWS_CACHE = pathlib.Path("output/news_insights_cache.json")
+NEWS_BATCH = 6
+
+
+def _biggest_recent_move(anomalies: list[dict], days: int = 45) -> dict | None:
+    cutoff = (dt.date.today() - dt.timedelta(days=days)).isoformat()
+    recent = [a for a in anomalies if str(a.get("date", "")) >= cutoff]
+    if not recent:
+        return None
+    a = max(recent, key=lambda x: abs(x.get("return_pct") or 0))
+    return {"date": a.get("date"), "return_pct": a.get("return_pct")}
+
+
+def _news_prompt(batch: dict) -> str:
+    return (
+        "You are a sharp, plain-spoken markets analyst writing for ordinary investors. "
+        "For EACH ticker below you get: company, industry, price statistics, its biggest recent "
+        "one-day move, and numbered recent headlines. Write 3 to 4 sentences per company that "
+        "REASON about why the stock looks the way it does:\n"
+        "- Start from what the price has actually done (use the stats), then connect it to the "
+        "headlines that genuinely explain it, citing them like [2]. If no headline explains the "
+        "move, say plainly that no clear news driver was found instead of guessing.\n"
+        "- Bring in what matters specifically for THIS industry and THIS company's business "
+        "(for example rates for banks, crude for oil, subscriber trends for telecom), not generic filler.\n"
+        "- Be specific and different for every company. Never reuse stock phrases. "
+        "Use the company's full name, no ticker symbols.\n"
+        "- Do not invent facts beyond the stats and headlines. No buy/sell advice, no price targets, "
+        "no guarantees. Plain words, no jargon like Sharpe or MAPE.\n"
+        "Reply STRICT JSON only: {\"TICKER\": {\"text\": \"...\", \"cites\": [headline numbers used]}, ...}\n\n"
+        + json.dumps(batch, ensure_ascii=False)
+    )
+
+
+def _clean_news_item(raw, n_headlines: int) -> dict | None:
+    if not isinstance(raw, dict):
+        return None
+    text = str(raw.get("text", "")).strip()
+    if len(text) < 40 or ADVICE_RE.search(text):
+        return None
+    cites = [c for c in raw.get("cites", []) if isinstance(c, int) and 1 <= c <= n_headlines]
+    return {"text": text, "cites": sorted(set(cites))}
+
+
+def _gemini_news_insights(client, compact: dict, news: dict, names: dict) -> dict:
+    """Per-ticker, news-grounded commentary. Same-day cache avoids re-spending on redeploys."""
+    today = dt.date.today().isoformat()
+    cache = {}
+    if NEWS_CACHE.exists():
+        try:
+            blob = json.loads(NEWS_CACHE.read_text())
+            if blob.get("date") == today:
+                cache = blob.get("items", {})
+        except (OSError, json.JSONDecodeError):
+            cache = {}
+
+    def sig(t: str) -> str:
+        return "|".join(h["title"] for h in news.get(t, []))
+
+    result: dict[str, dict] = {}
+    todo = []
+    for t in compact:
+        hit = cache.get(t)
+        if hit and hit.get("sig") == sig(t) and hit.get("value"):
+            result[t] = hit["value"]
+        else:
+            todo.append(t)
+    logger.info("news insights: %d cached, %d to generate", len(result), len(todo))
+
+    for i in range(0, len(todo), NEWS_BATCH):
+        chunk = todo[i:i + NEWS_BATCH]
+        batch = {}
+        for t in chunk:
+            c = compact[t]
+            batch[t] = {
+                "company": names.get(t, t),
+                "industry": c.get("sector"),
+                "as_of": today,
+                "change_1m_pct": c.get("change_1m"),
+                "annual_volatility": c.get("volatility"),
+                "worst_fall_from_peak_pct": c.get("max_drawdown"),
+                "pct_below_52w_high": c.get("pct_off_high"),
+                "pct_vs_50day_average": c.get("dist_ma50_pct"),
+                "biggest_move_last_45d": c.get("biggest_move"),
+                "headlines": [
+                    {"n": n, "date": h["date"], "source": h["source"], "title": h["title"]}
+                    for n, h in enumerate(news.get(t, []), 1)
+                ],
+            }
+        for attempt in range(3):
+            try:
+                resp = client.models.generate_content(
+                    model="gemini-2.5-flash", contents=_news_prompt(batch))
+                parsed = _parse_json_response(resp.text or "")
+                for t in chunk:
+                    item = _clean_news_item(parsed.get(t), len(news.get(t, [])))
+                    if item:
+                        item["as_of"] = today
+                        result[t] = item
+                        cache[t] = {"sig": sig(t), "value": item}
+                break
+            except Exception as e:  # noqa: BLE001
+                if "429" in str(e) and attempt < 2:
+                    wait = 20 * (attempt + 1)
+                    logger.warning("rate limited — wait %ds", wait)
+                    time.sleep(wait)
+                else:
+                    logger.error("Gemini news batch failed: %s", e)
+                    break
+        time.sleep(4)  # stay under free-tier requests-per-minute
+    try:
+        NEWS_CACHE.write_text(json.dumps({"date": today, "items": cache}))
+    except OSError as e:
+        logger.warning("could not write news cache: %s", e)
+    return result
+
+
 def build_insights() -> dict[str, str]:
     """Generate insights for all tickers in index; returns {ticker: text}."""
     if not INDEX_PATH.exists():
@@ -179,11 +296,13 @@ def build_insights() -> dict[str, str]:
     index = json.loads(INDEX_PATH.read_text())
     tickers: list[str] = index.get("tickers", [])
     compact: dict[str, dict] = {}
+    payloads: dict[str, dict] = {}
     for t in tickers:
         p = TICKER_DIR / f"{t}.json"
         if not p.exists():
             continue
         d = json.loads(p.read_text())
+        payloads[t] = d
         compact[t] = {
             "sector": sec.get_sector(t),
             "last_close": d["stats"].get("last_close"),
@@ -198,7 +317,19 @@ def build_insights() -> dict[str, str]:
             "anomalies": len(d.get("anomalies", [])),
             "pct_off_high": d["stats"].get("pct_off_high"),
             "dist_ma50_pct": d["stats"].get("dist_ma50_pct"),
+            "biggest_move": _biggest_recent_move(d.get("anomalies", [])),
         }
+
+    # Recent headlines for every ticker (no key needed); stored with each ticker's data.
+    news: dict[str, list[dict]] = {}
+    if os.environ.get("SKIP_NEWS") != "1":
+        from src import news as news_mod
+        news = news_mod.fetch_all(list(compact))
+        for t, items in news.items():
+            payloads[t]["news"] = items
+            (TICKER_DIR / f"{t}.json").write_text(json.dumps(payloads[t]))
+        logger.info("headlines fetched for %d tickers (%d with news)",
+                    len(news), sum(1 for v in news.values() if v))
 
     api_key = os.environ.get("GEMINI_API_KEY")
     snapshot = {
@@ -211,57 +342,21 @@ def build_insights() -> dict[str, str]:
         }
         for t, c in compact.items()
     }
+    out = {t: _rule_fallback(t, _stats_of(t, compact), _bt_of(t, compact))
+           for t in compact}
+    index["news_insights"] = {}
     if not api_key:
-        logger.warning("no GEMINI_API_KEY — rule-based fallback insights")
-        out = {t: _rule_fallback(t, _stats_of(t, compact), _bt_of(t, compact))
-               for t in compact}
+        logger.warning("no GEMINI_API_KEY — rule-based fallback, headlines only")
         index["market_insight"] = _market_fallback(snapshot)
         return _save(index, out)
 
-    prompt_base = (
-        "You are a cautious market-data commentator covering multiple sectors. "
-        "For each ticker below, write exactly 2 plain-English sentences: "
-        "sentence 1 names its sector and describes trend and risk from the stats; "
-        "sentence 2 states forecast reliability using the backtest verdict "
-        "('beats naive' = relatively trustworthy, 'worse than naive' = weak, "
-        "say so plainly). No buy/sell advice, no recommendations, no guarantees, "
-        "no price targets. Reply STRICT JSON only: {\"TICKER\": \"text\", ...}\n\n"
-    )
     from google import genai
 
+    from src import news as news_mod
+
     client = genai.Client(api_key=api_key)
-    # Per-sector batches (≤12 tickers each) so responses stay complete at scale
-    by_sector: dict[str, list[str]] = {}
-    for t, c in compact.items():
-        by_sector.setdefault(c.get("sector", "Other"), []).append(t)
-    result: dict[str, str] = {}
-    batches = [chunk for ts in by_sector.values()
-               for chunk in (ts[i:i + 12] for i in range(0, len(ts), 12))]
-    for bi, chunk in enumerate(batches):
-        sub = {t: compact[t] for t in chunk}
-        for attempt in range(3):
-            try:
-                resp = client.models.generate_content(
-                    model="gemini-2.5-flash-lite",
-                    contents=prompt_base + json.dumps(sub))
-                result.update(_parse_json_response(resp.text or ""))
-                break
-            except Exception as e:  # noqa: BLE001
-                if "429" in str(e) and attempt < 2:
-                    wait = 10 * (attempt + 1)
-                    logger.warning("rate limited — wait %ds (batch %d/%d)",
-                                   wait, bi + 1, len(batches))
-                    time.sleep(wait)
-                else:
-                    logger.error("Gemini batch %d failed: %s — fallback", bi + 1, e)
-                    break
-        time.sleep(2)  # stay under free-tier RPM across ~20 batches
-    out: dict[str, str] = {}
-    for t in compact:
-        txt = result.get(t, "")
-        if not txt or ADVICE_RE.search(txt):
-            txt = _rule_fallback(t, _stats_of(t, compact), _bt_of(t, compact))
-        out[t] = txt
+    index["news_insights"] = _gemini_news_insights(
+        client, compact, news, news_mod.company_names())
     index["market_insight"] = _market_via_gemini(client, snapshot)
     return _save(index, out)
 

@@ -212,3 +212,72 @@ def test_fallback_composes_from_numbers():
                                               "model_mape": 1.2})
     assert "calm" in txt2 and "strong risk-adjusted" in txt2
     assert "deserves some attention" in txt2
+
+
+# ── news-grounded insights ────────────────────────────────────────────────
+
+_FEED = b"""<rss><channel>
+<item><title>Chip maker soars on orders - Reuters</title><link>http://x/1</link>
+<pubDate>Thu, 08 Oct 2026 18:21:14 GMT</pubDate><source>Reuters</source></item>
+<item><title>Chip maker soars on orders - Reuters</title><link>http://x/2</link>
+<pubDate>Thu, 08 Oct 2026 19:00:00 GMT</pubDate><source>Reuters</source></item>
+<item><title>Another story</title><link>http://x/3</link>
+<pubDate>Fri, 09 Oct 2026 10:00:00 GMT</pubDate><source>Mint</source></item>
+</channel></rss>"""
+
+
+def test_news_parse_dedupes_and_strips_source():
+    from src import news
+
+    items = news.parse_feed(_FEED)
+    assert [i["title"] for i in items] == ["Chip maker soars on orders", "Another story"]
+    assert items[0]["date"] == "2026-10-08" and items[0]["source"] == "Reuters"
+    assert news.parse_feed(b"not xml") == []
+
+
+def test_news_company_names_and_search_name():
+    from src import news
+
+    names = news.company_names()
+    assert len(names) >= 230 and names["M&M.NS"].startswith("Mahindra")
+    assert news.search_name("AAPL", names["AAPL"]) == "Apple"
+    assert news.search_name("^NSEI", "x") == "Nifty 50 index"
+
+
+def test_clean_news_item_filters_advice_and_bad_cites():
+    from src import insights as ins
+
+    ok = "Apple rose because services revenue beat expectations [1], while iPhone demand stayed steady."
+    assert ins._clean_news_item({"text": ok, "cites": [1, 9, "x"]}, 2)["cites"] == [1]
+    assert ins._clean_news_item({"text": "You should buy this stock now, it is guaranteed to rise."
+                                 " More padding text here.", "cites": []}, 2) is None
+    assert ins._clean_news_item({"text": "short", "cites": []}, 2) is None
+    assert ins._clean_news_item("nope", 2) is None
+
+
+def test_gemini_news_insights_uses_cache_and_fake_client(tmp_path, monkeypatch):
+    from src import insights as ins
+
+    monkeypatch.setattr(ins, "NEWS_CACHE", tmp_path / "cache.json")
+    monkeypatch.setattr(ins.time, "sleep", lambda s: None)
+    calls = []
+
+    class _Resp:
+        text = ('{"AAA": {"text": "Alpha Corp climbed on strong orders [1], which fits an industry '
+                'that lives on order backlogs.", "cites": [1]}}')
+
+    class _Models:
+        def generate_content(self, model, contents):
+            calls.append(contents)
+            return _Resp()
+
+    class _Client:
+        models = _Models()
+
+    compact = {"AAA": {"sector": "Industrials", "change_1m": 5.0, "volatility": 0.2}}
+    news = {"AAA": [{"title": "Orders surge", "source": "Reuters", "date": "2026-10-08", "link": "l"}]}
+    out = ins._gemini_news_insights(_Client(), compact, news, {"AAA": "Alpha Corp"})
+    assert out["AAA"]["cites"] == [1] and "Alpha Corp" in out["AAA"]["text"]
+    assert "Orders surge" in calls[0] and "Alpha Corp" in calls[0]
+    out2 = ins._gemini_news_insights(_Client(), compact, news, {"AAA": "Alpha Corp"})
+    assert out2 == out and len(calls) == 1  # same-day cache, no second API call

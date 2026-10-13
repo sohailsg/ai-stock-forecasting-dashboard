@@ -202,8 +202,8 @@ select, input[type="search"] {
 .error-box { padding: 2rem; color: var(--danger); }
 .error-box ol { margin-top: 0.5rem; padding-left: 1.5rem; line-height: 2; }
 
-ul.clean { padding-left: 1.2rem; font-size: 0.9rem; }
-ul.clean li { margin-bottom: 0.25rem; font-variant-numeric: tabular-nums; }
+ul.clean, ol.clean { padding-left: 1.2rem; font-size: 0.9rem; }
+ul.clean li, ol.clean li { margin-bottom: 0.25rem; font-variant-numeric: tabular-nums; }
 
 footer.site {
   margin: 1.5rem 0 0.5rem;

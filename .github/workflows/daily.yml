@@ -23,6 +23,11 @@ jobs:
           path: data/stocks
           key: stocks-${{ hashFiles('data/stocks/*.csv') }}
           restore-keys: stocks-
+      - uses: actions/cache@v4
+        with:
+          path: output/news_insights_cache.json
+          key: news-${{ github.run_id }}
+          restore-keys: news-
       - run: uv run python -m src.build
       - run: uv run python -m src.insights
         env:

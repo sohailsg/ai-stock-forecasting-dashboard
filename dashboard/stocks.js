@@ -220,6 +220,7 @@ function render(payload) {
       `with ${nAn} anomal${nAn === 1 ? "y" : "ies"}${state.showFc ? `; showing ${fd} of ${payload.forecast.mean.length} forecast days` : "; forecast hidden"}. ` +
       ``;
   }
+  renderNews(payload);
   const ul = document.getElementById("anomaly-list");
   ul.innerHTML = "";
   const anomalies = payload.anomalies || [];
@@ -234,6 +235,33 @@ function render(payload) {
     renderMarket();
     if (state._chartSector !== activeSector()) { state._chartSector = activeSector(); renderInsightCharts(); }
   }
+}
+
+function renderNews(payload) {
+  const box = document.getElementById("news-box");
+  const items = payload.news || [];
+  const ai = (indexData.news_insights || {})[payload.ticker];
+  if (!items.length && !ai) { box.hidden = true; return; }
+  box.hidden = false;
+  document.getElementById("news-insight").textContent = ai
+    ? expandTickers(ai.text)
+    : "Recent headlines are listed below; the AI reading will appear after the next scheduled refresh.";
+  document.getElementById("news-tag").textContent = ai
+    ? `(AI reading of recent headlines, ${ai.as_of || "latest refresh"} — educational only)`
+    : "(recent headlines)";
+  const ol = document.getElementById("news-list");
+  ol.innerHTML = "";
+  const cited = new Set(ai ? ai.cites : []);
+  items.forEach((h, i) => {
+    const li = document.createElement("li");
+    const a = document.createElement("a");
+    a.href = h.link; a.target = "_blank"; a.rel = "noopener noreferrer";
+    a.textContent = h.title;
+    li.appendChild(a);
+    li.appendChild(document.createTextNode(` — ${h.source}${h.date ? ", " + h.date : ""}`));
+    if (cited.has(i + 1)) li.style.fontWeight = "600";
+    ol.appendChild(li);
+  });
 }
 
 function currentCSV() {
