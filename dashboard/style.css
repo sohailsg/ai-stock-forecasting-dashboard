@@ -110,6 +110,7 @@ select, input[type="search"] {
 
 /* Compare pills + heatmap + ranking */
 .pill { display: inline-flex; gap: 0.35rem; align-items: center; }
+#cmp-picks { max-height: 170px; overflow-y: auto; padding: 0.25rem; }
 #heatmap td, #heatmap th { border: 1px solid var(--border); padding: 0.35rem 0.5rem; text-align: center; }
 #heatmap td.cell { cursor: pointer; font-weight: 700; }
 #heatmap td.cell:hover { outline: 2px solid var(--primary); outline-offset: -2px; }

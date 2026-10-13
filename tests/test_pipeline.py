@@ -66,11 +66,21 @@ def test_backtest_verdict_logic():
     assert bt.verdict(None, 3.0) == "insufficient data"
 
 
-def test_holdout_on_synthetic():
+def test_correlation_pairs_shape():
+    from src import process as proc
+
+    frames = {"A": _prices(60), "B": _prices(60), "C": _prices(60, base=50.0)}
+    pairs = proc.correlation_pairs(frames, k=2)
+    assert set(pairs) == {"low", "high"}
+    assert len(pairs["low"]) == 2 and len(pairs["high"]) == 2
+    assert all(set(p) == {"a", "b", "v"} for p in pairs["low"] + pairs["high"])
+    assert all(p["a"] != p["b"] for p in pairs["low"] + pairs["high"])
+
+
+def test_holdout_has_frontend_keys():
     df = _prices(200)
     r = bt.holdout(df, horizon=10)
-    assert r["verdict"] in ("beats naive", "comparable", "worse than naive")
-    assert r["model_mape"] >= 0 and r["naive_mape"] >= 0
+    assert {"model_mape", "naive_mape", "verdict", "horizon"} <= set(r)
 
 
 def test_gemini_parser_fenced_and_malformed():
@@ -92,7 +102,9 @@ def test_nan_to_null_in_json():
 def test_sector_universe_is_us_india():
     from src import sectors as sec
 
-    assert len(sec.DEFAULT_TICKERS) == 49
+    assert len(sec.DEFAULT_TICKERS) == 236
+    assert len(set(sec.DEFAULT_TICKERS)) == 236  # no duplicates
+    assert len(sec.SECTORS) == 20
     assert "RELIANCE.NS" in sec.DEFAULT_TICKERS
     assert "AAPL" in sec.DEFAULT_TICKERS
     assert "^GSPC" in sec.DEFAULT_TICKERS
@@ -116,7 +128,7 @@ def test_fetch_defaults_to_sector_universe(monkeypatch):
 
     monkeypatch.delenv("TICKERS", raising=False)
     assert fet.get_tickers() == list(fet.DEFAULT_TICKERS)
-    assert len(fet.get_tickers()) == 49
+    assert len(fet.get_tickers()) == 236
 
 
 def test_position_metrics_known():

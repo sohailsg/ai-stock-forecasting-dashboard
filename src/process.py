@@ -58,6 +58,25 @@ def position_metrics(feat: pd.DataFrame) -> dict:
     }
 
 
+def correlation_pairs(frames: dict[str, pd.DataFrame], k: int = 15) -> dict:
+    """Diversification-ready pairs from the correlation matrix.
+
+    At 200+ tickers the full N×N matrix is ~1MB of JSON nobody reads, so the
+    index stores only the k least- and k most-correlated pairs (ADR-004).
+    """
+    m = correlation_matrix(frames)
+    ts = sorted(m)
+    pairs = []
+    for i, a in enumerate(ts):
+        row = m.get(a) or {}
+        for b in ts[i + 1:]:
+            v = row.get(b)
+            if v is not None:
+                pairs.append({"a": a, "b": b, "v": v})
+    pairs.sort(key=lambda p: p["v"])
+    return {"low": pairs[:k], "high": pairs[-k:][::-1]}
+
+
 def correlation_matrix(frames: dict[str, pd.DataFrame]) -> dict:
     """Correlation of daily returns across tickers (pairwise min_periods). (ST5.3)"""
     if len(frames) < 2:

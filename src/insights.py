@@ -218,7 +218,7 @@ def build_insights() -> dict[str, str]:
         index["market_insight"] = _market_fallback(snapshot)
         return _save(index, out)
 
-    prompt = (
+    prompt_base = (
         "You are a cautious market-data commentator covering multiple sectors. "
         "For each ticker below, write exactly 2 plain-English sentences: "
         "sentence 1 names its sector and describes trend and risk from the stats; "
@@ -226,27 +226,36 @@ def build_insights() -> dict[str, str]:
         "('beats naive' = relatively trustworthy, 'worse than naive' = weak, "
         "say so plainly). No buy/sell advice, no recommendations, no guarantees, "
         "no price targets. Reply STRICT JSON only: {\"TICKER\": \"text\", ...}\n\n"
-        + json.dumps(compact)
     )
     from google import genai
 
     client = genai.Client(api_key=api_key)
+    # Per-sector batches (≤12 tickers each) so responses stay complete at scale
+    by_sector: dict[str, list[str]] = {}
+    for t, c in compact.items():
+        by_sector.setdefault(c.get("sector", "Other"), []).append(t)
     result: dict[str, str] = {}
-    for attempt in range(5):
-        try:
-            resp = client.models.generate_content(
-                model="gemini-2.5-flash-lite", contents=prompt)
-            result = _parse_json_response(resp.text or "")
-            break
-        except Exception as e:  # noqa: BLE001
-            if "429" in str(e) and attempt < 4:
-                wait = 10 * (attempt + 1)
-                logger.warning("rate limited — wait %ds (retry %d/4)", wait, attempt + 1)
-                time.sleep(wait)
-            else:
-                logger.error("Gemini failed: %s — fallback", e)
-                result = {}
+    batches = [chunk for ts in by_sector.values()
+               for chunk in (ts[i:i + 12] for i in range(0, len(ts), 12))]
+    for bi, chunk in enumerate(batches):
+        sub = {t: compact[t] for t in chunk}
+        for attempt in range(3):
+            try:
+                resp = client.models.generate_content(
+                    model="gemini-2.5-flash-lite",
+                    contents=prompt_base + json.dumps(sub))
+                result.update(_parse_json_response(resp.text or ""))
                 break
+            except Exception as e:  # noqa: BLE001
+                if "429" in str(e) and attempt < 2:
+                    wait = 10 * (attempt + 1)
+                    logger.warning("rate limited — wait %ds (batch %d/%d)",
+                                   wait, bi + 1, len(batches))
+                    time.sleep(wait)
+                else:
+                    logger.error("Gemini batch %d failed: %s — fallback", bi + 1, e)
+                    break
+        time.sleep(2)  # stay under free-tier RPM across ~20 batches
     out: dict[str, str] = {}
     for t in compact:
         txt = result.get(t, "")

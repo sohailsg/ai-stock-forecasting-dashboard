@@ -71,7 +71,8 @@ def _download(ticker: str, period: str = "5y") -> pd.DataFrame:
 
 def _normalize(df: pd.DataFrame, ticker: str) -> pd.DataFrame:
     """Flatten multi-index columns, keep date+close, validate (S4-ST4.3.2/3)."""
-    # yfinance >=0.2.32 returns MultiIndex columns like ('Close', 'AAPL')
+    # yfinance >=0.2.32 returns MultiIndex columns like ('Close', 'AAPL');
+    # batch group_by="ticker" frames arrive as plain per-ticker frames.
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
     # Prefer Close (already adjusted via auto_adjust=True); fall back to Adj Close
@@ -111,18 +112,80 @@ def fetch_ticker(ticker: str, use_cache_on_failure: bool = True) -> pd.DataFrame
         return None
 
 
+def _save_cache(ticker: str, clean: pd.DataFrame) -> None:
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    clean.to_csv(CACHE_DIR / f"{ticker}.csv", index=False)
+
+
+def _load_cache(ticker: str) -> pd.DataFrame | None:
+    p = CACHE_DIR / f"{ticker}.csv"
+    return pd.read_csv(p, parse_dates=["date"]) if p.exists() else None
+
+
+def _download_batch(tickers: list[str], period: str = "5y") -> dict[str, pd.DataFrame]:
+    """One batched download for the whole universe (fast at 200+ tickers).
+
+    Returns {ticker: raw frame}. Tickers missing from the response are simply
+    absent — the caller falls back to individual fetch for those.
+    """
+    import yfinance as yf
+
+    logger.info("batch downloading %d tickers (%s)", len(tickers), period)
+    df = yf.download(
+        tickers, period=period, auto_adjust=True, progress=False,
+        group_by="ticker", threads=True,
+    )
+    if df is None or df.empty:
+        raise ValueError("empty batch response")
+    out: dict[str, pd.DataFrame] = {}
+    for t in tickers:
+        try:
+            sub = df[t] if isinstance(df.columns, pd.MultiIndex) else df
+            if sub is not None and not sub.empty:
+                out[t] = sub
+        except (KeyError, TypeError):
+            continue
+    logger.info("batch: %d/%d tickers present", len(out), len(tickers))
+    return out
+
+
 def fetch_all(tickers: list[str] | None = None) -> dict[str, pd.DataFrame]:
-    """Fetch every ticker; bad tickers are skipped, never fatal."""
+    """Batch download first, individual retry for gaps, cache fallback last.
+
+    Bad tickers are skipped, never fatal.
+    """
     tickers = tickers or get_tickers()
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
     results: dict[str, pd.DataFrame] = {}
-    for i, t in enumerate(tickers):
+    try:
+        batch = _download_batch(tickers)
+    except Exception as e:  # noqa: BLE001 — whole batch failed, go individual
+        logger.error("batch failed (%s) — falling back to individual fetch", e)
+        batch = {}
+    missing = [t for t in tickers if t not in batch]
+    for i, t in enumerate(missing):
         if i > 0:
             time.sleep(INTER_TICKER_DELAY)
-        t0 = time.time()
-        df = fetch_ticker(t)
+        df = fetch_ticker(t)  # individual path with own retries + cache fallback
         if df is not None:
             results[t] = df
-        logger.info("%s: done in %.1fs", t, time.time() - t0)
+    for t, raw in batch.items():
+        try:
+            clean = _normalize(raw.copy(), t)
+            _save_cache(t, clean)
+            results[t] = clean
+        except Exception as e:  # noqa: BLE001 — bad slice, try individual
+            logger.warning("%s: batch slice unusable (%s) — individual retry", t, e)
+            df = fetch_ticker(t)
+            if df is not None:
+                results[t] = df
+    # Final safety net: cache for anything still missing
+    for t in tickers:
+        if t not in results:
+            cached = _load_cache(t)
+            if cached is not None:
+                logger.info("%s: using cache", t)
+                results[t] = cached
     logger.info("fetch_all: %d/%d tickers OK", len(results), len(tickers))
     return results
 

@@ -155,6 +155,7 @@ function render(payload) {
   const verdict = (payload.backtest || {}).verdict || "unknown";
   document.getElementById("ai-tag").textContent =
     `Forecast reliability: ${verdict} (model MAPE ${payload.backtest.model_mape}% vs naive ${payload.backtest.naive_mape}%)`;
+  document.getElementById("live-insight").textContent = liveNarrative(payload, s);
   const ul = document.getElementById("anomaly-list");
   ul.innerHTML = "";
   const anomalies = payload.anomalies || [];
@@ -194,6 +195,74 @@ function currentPNG() {
   a.href = tmp.toDataURL("image/png");
   a.download = `${state.ticker}_chart.png`;
   a.click();
+}
+
+/* ── Live narrative: recomputed on every state change ────────────────────
+   Plain-language, data-driven commentary. Moves with ticker, range,
+   horizon and compare picks — nothing hardcoded. */
+
+function plainVerdict(bt) {
+  if (!bt || bt.model_mape == null || bt.naive_mape == null) return "not enough history to judge";
+  if (bt.verdict === "beats naive")
+    return `beating the dumb guess (off by ${bt.model_mape}% vs ${bt.naive_mape}%)`;
+  if (bt.verdict === "comparable")
+    return `no better than the dumb guess (${bt.model_mape}% vs ${bt.naive_mape}%)`;
+  return `losing to the dumb guess (${bt.model_mape}% vs ${bt.naive_mape}%) — decoration`;
+}
+
+function liveNarrative(payload, s) {
+  const t = payload.ticker, sym = symOf(t);
+  const closes = s.close.filter((v) => v != null);
+  if (!closes.length) return "";
+  const first = closes[0], last = closes[closes.length - 1];
+  const pct = ((last / first - 1) * 100);
+  const days = s.dates.length;
+  const ma20 = s.ma20[s.ma20.length - 1], ma50 = s.ma50[s.ma50.length - 1];
+  const maBits = [];
+  if (ma20 != null) maBits.push(`its 20-day average (${sym}${ma20.toLocaleString()}) — roughly the last month's memory — price sits ${last >= ma20 ? "above it, buyers in charge lately" : "below it, sellers in charge lately"}`);
+  if (ma50 != null) maBits.push(`its 50-day average (${sym}${ma50.toLocaleString()}) — the 2½-month trend — price sits ${last >= ma50 ? "above" : "below"} it`);
+  let fcBit = "forecast hidden";
+  if (state.showFc) {
+    const fd = Math.min(state.fcDays, payload.forecast.mean.length);
+    const fLast = payload.forecast.mean[fd - 1];
+    const fPct = ((fLast / last - 1) * 100);
+    fcBit = `the model stretches the trend ${fd} days to ${sym}${fLast.toLocaleString()} (${fPct >= 0 ? "+" : ""}${fPct.toFixed(1)}%), and its track record is ${plainVerdict(payload.backtest)}`;
+  }
+  return `You're looking at ${t} (${sectorOf(t)}) over the last ${days} trading days: ` +
+    `${sym}${first.toLocaleString()} → ${sym}${last.toLocaleString()} (${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%). ` +
+    (maBits.length ? `Against trend lines: ${maBits.join("; ")}.` : "") +
+    ` Ahead: ${fcBit}.`;
+}
+
+function compareNarrative() {
+  const el = document.getElementById("cmp-insight");
+  if (!state.cmp.length) { el.textContent = ""; return; }
+  const rows = state.cmp
+    .filter((t) => cache[t])
+    .map((t) => {
+      const p = cache[t];
+      const n = Math.min(state.range, p.dates.length);
+      const closes = p.close.slice(-n).filter((v) => v != null);
+      const chg = ((closes[closes.length - 1] / closes[0] - 1) * 100);
+      const snap = (indexData.snapshot || {})[t] || {};
+      return { t, chg, vol: snap.volatility, verdict: snap.verdict, sector: sectorOf(t) };
+    });
+  if (rows.length < 2) {
+    el.textContent = rows.length
+      ? `${rows[0].t}: ${rows[0].chg >= 0 ? "+" : ""}${rows[0].chg.toFixed(1)}% over this stretch. Pick a second stock to compare.`
+      : "";
+    return;
+  }
+  rows.sort((a, b) => b.chg - a.chg);
+  const [win, ...rest] = rows;
+  const lose = rest[rest.length - 1];
+  const calm = [...rows].sort((a, b) => (a.vol ?? 9) - (b.vol ?? 9))[0];
+  el.textContent =
+    `${win.t} grew most here (${win.chg >= 0 ? "+" : ""}${win.chg.toFixed(1)}%) while ` +
+    `${lose.t} trailed (${lose.chg >= 0 ? "+" : ""}${lose.chg.toFixed(1)}%). ` +
+    `Calmest ride: ${calm.t} (volatility ${calm.vol ?? "—"}). ` +
+    `On forecast honesty: ${rows.map((r) => `${r.t} is ${r.verdict || "unrated"}`).join("; ")}. ` +
+    `Educational comparison only — not advice.`;
 }
 
 async function selectTicker(t) {
@@ -348,6 +417,7 @@ async function ensureLoaded(t) {
 async function updateCompare() {
   renderCmpPicks();
   if (cmpChart) { cmpChart.destroy(); cmpChart = null; }
+  compareNarrative();
   if (!state.cmp.length) return;
   const picks = state.cmp.slice(0, 3);
   await Promise.all(picks.map(ensureLoaded));
@@ -395,21 +465,9 @@ function comparePair(a, b) {
 /* ── Diversification pairs (heatmap replacement) ─────────────────────────
    Each list entry answers: "which two stocks move (least/most) together?" */
 
-function allPairs() {
-  const corr = indexData.correlations || {};
-  const ts = indexData.tickers;
-  const out = [];
-  for (let i = 0; i < ts.length; i++) {
-    for (let j = i + 1; j < ts.length; j++) {
-      const v = corr[ts[i]] && corr[ts[i]][ts[j]];
-      if (v != null) out.push({ a: ts[i], b: ts[j], v });
-    }
-  }
-  return out.sort((x, y) => x.v - y.v);
-}
-
 function renderPairs() {
-  const pairs = allPairs();
+  // Backend-computed pairs scale to 200+ tickers (no giant matrix in the page)
+  const stored = indexData.pairs;
   const mk = (list, elId) => {
     const ul = document.getElementById(elId);
     ul.innerHTML = "";
@@ -426,8 +484,8 @@ function renderPairs() {
       ul.appendChild(li);
     });
   };
-  mk(pairs.slice(0, 5), "pairs-low");
-  mk(pairs.slice(-5).reverse(), "pairs-high");
+  mk((stored && stored.low) || [], "pairs-low");
+  mk((stored && stored.high) || [], "pairs-high");
 }
 
 /* ── Analyst insight charts: one question per graph ─────────────────────── */

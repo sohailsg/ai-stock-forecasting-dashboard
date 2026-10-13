@@ -1,13 +1,19 @@
 """build.py — assemble per-ticker JSON + stock_index.json (S5-ST5.4, S12).
 
+Scale note (ADR-004): at 200+ tickers per-ticker work runs in a thread pool
+and backtests use the single hold-out window (1 refit) instead of the
+5-window walk-forward (5 refits). bt.rolling stays for research/tests.
+
 Schema v1:
   output/stocks/<TICKER>.json:
-    {ticker, schema_version, generated_at, dates, close, ma20, ma50,
+    {ticker, schema_version, generated_at, currency, dates, close, ma20, ma50,
      forecast {dates, mean, lower, upper, method, horizon},
-     stats {last_close, change_1m, volatility, sharpe, max_drawdown},
-     anomalies [{date, price, return_pct, z}], backtest {...}}
+     stats {last_close, change_1m, volatility, sharpe, max_drawdown,
+            high_52w, pct_off_high, dist_ma50_pct, above_ma50},
+     anomalies [{date, price, return_pct, z}], backtest {hold-out, verdict}}
   output/stocks/index.json:
-    {schema_version, tickers, sectors, correlations, generated_at}
+    {schema_version, tickers, sectors, snapshot, pairs, insights,
+     market_insight, generated_at}
 Insights (S9) are merged into index.json by insights.py; build leaves {}.
 """
 
@@ -18,6 +24,7 @@ import json
 import logging
 import math
 import pathlib
+from concurrent.futures import ThreadPoolExecutor
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -57,7 +64,7 @@ def build_ticker(ticker: str, df: pd.DataFrame) -> dict:
         "forecast": fc.forecast_close(df, horizon),
         "stats": proc.risk_metrics(df),
         "anomalies": anz.detect(df),
-        "backtest": bt.rolling(df, horizon),
+        "backtest": bt.holdout(df, horizon),  # ADR-004: 1 refit, not 5
     }
     return payload
 
@@ -72,12 +79,13 @@ def build_all() -> dict:
         "schema_version": SCHEMA_VERSION,
         "tickers": sorted(frames),
         "sectors": {t: sec.get_sector(t) for t in frames},
-        "correlations": proc.correlation_matrix(frames),
+        "pairs": proc.correlation_pairs(frames),
         "insights": {},
         "generated_at": dt.datetime.now(dt.timezone.utc).isoformat(),
     }
-    for t, df in frames.items():
-        payload = build_ticker(t, df)
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        payloads = list(ex.map(lambda t: (t, build_ticker(t, frames[t])), frames))
+    for t, payload in payloads:
         (OUT_DIR / f"{t}.json").write_text(json.dumps(payload))  # compact (S17)
         logger.info("%s: stats=%s backtest=%s anomalies=%d", t,
                     payload["stats"], payload["backtest"].get("verdict"),

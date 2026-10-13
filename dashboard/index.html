@@ -77,6 +77,7 @@
     <section class="chart-section" aria-label="Price chart">
       <h2 id="chart-title">Price</h2>
       <div class="chart-wrap tall"><canvas id="chart-main"></canvas></div>
+      <p id="live-insight" aria-live="polite" style="margin-top:.75rem;font-size:.92rem"></p>
       <details style="margin-top:.75rem">
         <summary style="cursor:pointer;font-weight:600">How the forecast works (plain English)</summary>
         <p style="margin-top:.5rem;font-size:.9rem">We fit a classic time-series model (ARIMA) to past prices and extend the
@@ -137,6 +138,7 @@
     <section class="chart-section" aria-label="Compare">
       <h2>Head-to-head <span class="tag">growth of 100 invested — pick up to 3</span></h2>
       <div class="toggles" id="cmp-picks" role="group" aria-label="Tickers to compare"></div>
+      <p id="cmp-insight" aria-live="polite" style="margin-top:.6rem;font-size:.92rem"></p>
       <div class="chart-wrap" style="margin-top:.75rem"><canvas id="chart-cmp"></canvas></div>
     </section>
 
@@ -160,9 +162,10 @@
         <li><strong>Volatility</strong> — how wildly the price swings, annualised. 0.15 is calm, 0.40+ is a rollercoaster.</li>
         <li><strong>Sharpe</strong> — return per unit of risk. Above 1 = genuinely good; below 0 = pain without pay.</li>
         <li><strong>Max drawdown</strong> — worst peak-to-trough fall. Your worst-case history lesson.</li>
-        <li><strong>MA20 / MA50</strong> — average price over 20 / 50 days. Price above MA50 = uptrend.</li>
+        <li><strong>MA20 / MA50</strong> — the average price over the last 20 trading days (about a month) / 50 days (about 2½ months). Think of them as the market's memory: price trading <em>above</em> its average means buyers have been in charge lately; <em>below</em> means sellers are.</li>
         <li><strong>52-week high</strong> — highest price in a year. Far below it can mean a dip — or a reason.</li>
         <li><strong>MAPE</strong> — average % the forecast was off in backtests. Lower is better.</li>
+        <li><strong>The "naive guess"</strong> — the dumbest possible forecast: tomorrow's price = today's price. Every model must beat it to earn your trust. <strong>Beats naive</strong> = our model's error was clearly smaller · <strong>comparable</strong> = no better than the dumb guess · <strong>worse than naive</strong> = decoration, ignore the projection.</li>
         <li><strong>Anomaly (z-score)</strong> — a daily move so big (&gt;3 standard deviations) it stands out from the last 60 days.</li>
         <li><strong>Correlation</strong> — do two stocks move together? 1.0 = lockstep, 0 = independent. Low pairs diversify you.</li>
       </ul>
