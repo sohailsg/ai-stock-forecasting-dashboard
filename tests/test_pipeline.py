@@ -92,7 +92,7 @@ def test_nan_to_null_in_json():
 def test_sector_universe_is_us_india():
     from src import sectors as sec
 
-    assert len(sec.DEFAULT_TICKERS) == 40
+    assert len(sec.DEFAULT_TICKERS) == 49
     assert "RELIANCE.NS" in sec.DEFAULT_TICKERS
     assert "AAPL" in sec.DEFAULT_TICKERS
     assert "^GSPC" in sec.DEFAULT_TICKERS
@@ -116,7 +116,7 @@ def test_fetch_defaults_to_sector_universe(monkeypatch):
 
     monkeypatch.delenv("TICKERS", raising=False)
     assert fet.get_tickers() == list(fet.DEFAULT_TICKERS)
-    assert len(fet.get_tickers()) == 40
+    assert len(fet.get_tickers()) == 49
 
 
 def test_position_metrics_known():
@@ -169,3 +169,24 @@ def test_market_fallback_names_movers():
     }
     txt = ins._market_fallback(snap)
     assert "AAA" in txt and "BBB" in txt and "1 of 2" in txt
+
+
+def test_fallback_composes_from_numbers():
+    from src import insights as ins
+
+    stats = {"sector": "Energy", "change_1m": -4.5, "volatility": 0.30,
+             "sharpe": -0.2, "max_drawdown": -20.0, "pct_off_high": -26.0,
+             "dist_ma50_pct": -8.0, "anomalies": 3}
+    txt = ins._rule_fallback("XOM", stats, {"verdict": "worse than naive",
+                                            "model_mape": 5.0})
+    assert txt.startswith("XOM fell 4.5%")
+    assert "Energy" in txt and "26.0% below its 52-week high" in txt
+    assert "below its 50-day trend line" in txt and "choppy" in txt
+    assert "3 unusual daily moves" in txt and "illustrative only" in txt
+
+    stats2 = dict(stats, change_1m=6.0, volatility=0.10, sharpe=1.5,
+                  dist_ma50_pct=2.0, anomalies=0)
+    txt2 = ins._rule_fallback("AAA", stats2, {"verdict": "beats naive",
+                                              "model_mape": 1.2})
+    assert "calm" in txt2 and "strong risk-adjusted" in txt2
+    assert "deserves some attention" in txt2

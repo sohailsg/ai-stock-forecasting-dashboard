@@ -33,35 +33,105 @@ def _save(index: dict, out: dict[str, str]) -> dict[str, str]:
     return out
 
 
+def _vol_word(vol: float | None) -> str:
+    if vol is None:
+        return "unknown choppiness"
+    if vol < 0.15:
+        return "calm"
+    if vol < 0.25:
+        return "moderately choppy"
+    if vol < 0.40:
+        return "choppy"
+    return "very choppy"
+
+
 def _rule_fallback(ticker: str, stats: dict, backtest: dict) -> str:
+    """Compose insight from the actual numbers — no fixed template.
+
+    stats/backtest may be the slim _stats_of/_bt_of dicts or the full compact
+    entry; every field is optional.
+    """
     chg = stats.get("change_1m")
     vol = stats.get("volatility")
+    sharpe = stats.get("sharpe")
+    dd = stats.get("max_drawdown")
+    off_high = stats.get("pct_off_high")
+    dist_ma = stats.get("dist_ma50_pct")
+    anoms = stats.get("anomalies")
     verdict = backtest.get("verdict", "unknown")
-    trend = "rose" if (chg or 0) > 0 else "fell"
-    return (
-        f"{ticker} {trend} {abs(chg or 0):.1f}% over the last month with "
-        f"annualised volatility {vol}. "
-        f"The statistical forecast {verdict} over recent history, so treat "
-        f"the 30-day projection as an extrapolation, not a prediction."
-    )
+    mape = backtest.get("model_mape")
+    sector = stats.get("sector")
+
+    trend = "rose" if (chg or 0) >= 0 else "fell"
+    s1 = f"{ticker} {trend} {abs(chg or 0):.1f}% over the last month"
+    if sector and sector != "Other":
+        s1 += f", a {sector} name"
+    if off_high is not None:
+        s1 += f" and now sits {abs(off_high):.1f}% below its 52-week high"
+    if dist_ma is not None:
+        s1 += f", {'above' if dist_ma >= 0 else 'below'} its 50-day trend line"
+    s1 += "."
+
+    s2 = f"Trading has been {_vol_word(vol)} (annualised volatility {vol})"
+    if sharpe is not None:
+        if sharpe > 1:
+            s2 += f" with a strong risk-adjusted return (Sharpe {sharpe})"
+        elif sharpe > 0:
+            s2 += f" with a mildly positive risk-adjusted return (Sharpe {sharpe})"
+        else:
+            s2 += f" and risk-adjusted returns are negative (Sharpe {sharpe})"
+    if dd is not None:
+        s2 += f"; its worst fall from a peak was {abs(dd):.1f}%"
+    s2 += "."
+
+    if verdict == "beats naive":
+        s3 = (f"The statistical forecast has recently beaten a naive "
+              f"buy-and-hold guess (error {mape}%), so its 30-day projection "
+              f"deserves some attention — still an extrapolation, not a prediction.")
+    elif verdict == "comparable":
+        s3 = (f"The statistical forecast is only as good as a naive guess "
+              f"(error {mape}%), so read its 30-day projection with scepticism.")
+    elif verdict == "worse than naive":
+        s3 = (f"The statistical forecast has recently done worse than simply "
+              f"repeating today's price (error {mape}%), so treat its 30-day "
+              f"projection as illustrative only.")
+    else:
+        s3 = "There is not enough history to judge the forecast, so treat it cautiously."
+    if isinstance(anoms, int) and anoms > 0:
+        s3 += f" Note: {anoms} unusual daily move{'s' if anoms > 1 else ''} flagged recently."
+    return f"{s1} {s2} {s3}"
 
 
 def _market_fallback(snapshot: dict) -> str:
-    """Rule-based market overview: best/worst movers, model honesty count."""
+    """Market overview composed from the data: movers, sectors, breadth, honesty."""
     rows = [(t, v) for t, v in snapshot.items() if v.get("change_1m") is not None]
     if not rows:
         return "Market overview unavailable."
     rows.sort(key=lambda kv: kv[1]["change_1m"])
     worst, best = rows[0], rows[-1]
     beats = sum(1 for _, v in rows if v.get("verdict") == "beats naive")
-    return (
-        f"Across {len(rows)} tracked stocks, {best[0]} led at "
-        f"+{best[1]['change_1m']:.1f}% while {worst[0]} lagged at "
-        f"{worst[1]['change_1m']:.1f}% over the last month. "
-        f"Statistical forecasts beat the naive baseline for {beats} of {len(rows)} "
-        f"tickers, so treat individual projections with the caution their "
-        f"backtest verdicts indicate."
-    )
+    above = sum(1 for _, v in rows
+                if isinstance(v.get("dist_ma50_pct"), (int, float)) and v["dist_ma50_pct"] >= 0)
+    measured = sum(1 for _, v in rows if isinstance(v.get("dist_ma50_pct"), (int, float)))
+    by_sec: dict[str, list[float]] = {}
+    for _, v in rows:
+        if v.get("sector"):
+            by_sec.setdefault(v["sector"], []).append(v["change_1m"])
+    sec_avg = sorted(((s, sum(a) / len(a)) for s, a in by_sec.items()),
+                     key=lambda kv: kv[1])
+    s1 = (f"Across {len(rows)} tracked stocks, {best[0]} led at "
+          f"+{best[1]['change_1m']:.1f}% while {worst[0]} lagged at "
+          f"{worst[1]['change_1m']:.1f}% over the last month.")
+    if sec_avg:
+        s1 += (f" At industry level, {sec_avg[-1][0]} averaged "
+               f"+{sec_avg[-1][1]:.1f}% and {sec_avg[0][0]} averaged "
+               f"{sec_avg[0][1]:.1f}%.")
+    s2 = (f"{above} of {measured} stocks trade above their 50-day trend line, "
+          f"so breadth is {'healthy' if measured and above / measured > 0.5 else 'narrow'}.")
+    s2 += (f" Statistical forecasts beat a naive guess for {beats} of {len(rows)} "
+           f"tickers, so give each projection only the trust its backtest "
+           f"verdict earns.")
+    return f"{s1} {s2}"
 
 
 def _market_via_gemini(client, snapshot: dict) -> str:
@@ -126,6 +196,8 @@ def build_insights() -> dict[str, str]:
             "naive_mape": d["backtest"].get("naive_mape"),
             "forecast_method": d["forecast"].get("method"),
             "anomalies": len(d.get("anomalies", [])),
+            "pct_off_high": d["stats"].get("pct_off_high"),
+            "dist_ma50_pct": d["stats"].get("dist_ma50_pct"),
         }
 
     api_key = os.environ.get("GEMINI_API_KEY")
@@ -187,12 +259,21 @@ def build_insights() -> dict[str, str]:
 
 def _stats_of(t: str, compact: dict) -> dict:
     c = compact.get(t, {})
-    return {"change_1m": c.get("change_1m"), "volatility": c.get("volatility")}
+    return {
+        "sector": c.get("sector"),
+        "change_1m": c.get("change_1m"),
+        "volatility": c.get("volatility"),
+        "sharpe": c.get("sharpe"),
+        "max_drawdown": c.get("max_drawdown"),
+        "pct_off_high": c.get("pct_off_high"),
+        "dist_ma50_pct": c.get("dist_ma50_pct"),
+        "anomalies": c.get("anomalies"),
+    }
 
 
 def _bt_of(t: str, compact: dict) -> dict:
     c = compact.get(t, {})
-    return {"verdict": c.get("backtest", "unknown")}
+    return {"verdict": c.get("backtest", "unknown"), "model_mape": c.get("model_mape")}
 
 
 if __name__ == "__main__":

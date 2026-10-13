@@ -66,17 +66,26 @@
     </section>
 
     <section class="kpi-cards" aria-label="Key metrics" aria-live="polite">
-      <div class="card"><h2>Last close</h2><p class="kpi-value loading" id="kpi-close">—</p></div>
-      <div class="card"><h2>1M change</h2><p class="kpi-value loading" id="kpi-chg">—</p></div>
-      <div class="card"><h2>Volatility</h2><p class="kpi-value loading" id="kpi-vol">—</p></div>
-      <div class="card"><h2>Sharpe</h2><p class="kpi-value loading" id="kpi-sharpe">—</p></div>
-      <div class="card"><h2>Max drawdown</h2><p class="kpi-value loading" id="kpi-dd">—</p></div>
-      <div class="card"><h2>Backtest</h2><p class="kpi-value loading" id="kpi-bt" style="font-size:.95rem">—</p></div>
+      <div class="card" title="Latest closing price"><h2>Last close</h2><p class="kpi-value loading" id="kpi-close">—</p></div>
+      <div class="card" title="Price change over the last ~21 trading days"><h2>1M change</h2><p class="kpi-value loading" id="kpi-chg">—</p></div>
+      <div class="card" title="How much the price typically swings, scaled to a year. Higher = bumpier ride."><h2>Volatility</h2><p class="kpi-value loading" id="kpi-vol">—</p></div>
+      <div class="card" title="Return earned per unit of risk. Above 1 is strong, below 0 means the ride wasn't worth it."><h2>Sharpe</h2><p class="kpi-value loading" id="kpi-sharpe">—</p></div>
+      <div class="card" title="Worst fall from a peak. -30% means buyers at the top are down almost a third."><h2>Max drawdown</h2><p class="kpi-value loading" id="kpi-dd">—</p></div>
+      <div class="card" title="Did our forecast model beat simply repeating today's price? MAPE = average % error."><h2>Backtest</h2><p class="kpi-value loading" id="kpi-bt" style="font-size:.95rem">—</p></div>
     </section>
 
     <section class="chart-section" aria-label="Price chart">
       <h2 id="chart-title">Price</h2>
       <div class="chart-wrap tall"><canvas id="chart-main"></canvas></div>
+      <details style="margin-top:.75rem">
+        <summary style="cursor:pointer;font-weight:600">How the forecast works (plain English)</summary>
+        <p style="margin-top:.5rem;font-size:.9rem">We fit a classic time-series model (ARIMA) to past prices and extend the
+        trend 30 business days out; the shaded band is the 95% confidence interval — wider means less sure.
+        It cannot predict news, results or events. The <strong>backtest</strong> replays history: we hide the last
+        30 days, forecast them, and measure the average % error (<strong>MAPE</strong>) against both our model and a
+        naive "tomorrow = today" guess. <strong>Beats naive</strong> = worth a look · <strong>comparable</strong> =
+        no better than guessing · <strong>worse than naive</strong> = ignore the projection.</p>
+      </details>
     </section>
 
     <section class="chart-section" aria-label="Insight and anomalies">
@@ -143,6 +152,20 @@
           <ul class="clean" id="pairs-high"></ul>
         </div>
       </div>
+    </section>
+    <section class="chart-section" aria-label="Glossary">
+      <h2>What do these words mean? <span class="tag">(30-second guide)</span></h2>
+      <ul class="clean">
+        <li><strong>1M change</strong> — price move over the last ~21 trading days. Momentum snapshot.</li>
+        <li><strong>Volatility</strong> — how wildly the price swings, annualised. 0.15 is calm, 0.40+ is a rollercoaster.</li>
+        <li><strong>Sharpe</strong> — return per unit of risk. Above 1 = genuinely good; below 0 = pain without pay.</li>
+        <li><strong>Max drawdown</strong> — worst peak-to-trough fall. Your worst-case history lesson.</li>
+        <li><strong>MA20 / MA50</strong> — average price over 20 / 50 days. Price above MA50 = uptrend.</li>
+        <li><strong>52-week high</strong> — highest price in a year. Far below it can mean a dip — or a reason.</li>
+        <li><strong>MAPE</strong> — average % the forecast was off in backtests. Lower is better.</li>
+        <li><strong>Anomaly (z-score)</strong> — a daily move so big (&gt;3 standard deviations) it stands out from the last 60 days.</li>
+        <li><strong>Correlation</strong> — do two stocks move together? 1.0 = lockstep, 0 = independent. Low pairs diversify you.</li>
+      </ul>
     </section>
   </main>
 

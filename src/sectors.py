@@ -1,6 +1,6 @@
 """sectors.py — ticker universe grouped by industry (US + India + benchmarks).
 
-Analyst coverage: leaders in every major sector of both markets so
+Analyst coverage: leaders in every major industry of both markets so
 cross-industry comparison is meaningful, plus home-market benchmarks
 for relative strength.
 """
@@ -8,20 +8,22 @@ for relative strength.
 from __future__ import annotations
 
 SECTORS: dict[str, list[str]] = {
-    "Technology": ["AAPL", "MSFT"],
-    "Communication": ["GOOGL", "META", "NFLX"],
+    "Technology": ["AAPL", "MSFT", "CRM"],
+    "Communication": ["GOOGL", "META", "NFLX", "DIS"],
     "Semiconductors": ["NVDA", "AVGO", "AMD"],
     "EV & Auto": ["TSLA", "F", "GM", "MARUTI.NS", "M&M.NS"],
     "Financials": ["JPM", "V", "BAC"],
-    "BFSI": ["HDFCBANK.NS", "ICICIBANK.NS", "SBIN.NS"],
-    "Healthcare": ["JNJ", "LLY", "UNH"],
-    "Consumer": ["AMZN", "WMT", "COST", "HINDUNILVR.NS", "TITAN.NS"],
+    "BFSI": ["HDFCBANK.NS", "ICICIBANK.NS", "SBIN.NS", "BAJFINANCE.NS"],
+    "Healthcare": ["JNJ", "LLY", "UNH", "PFE"],
+    "Consumer": ["AMZN", "WMT", "COST", "TITAN.NS"],
     "Energy": ["XOM", "CVX", "RELIANCE.NS"],
     "Industrials": ["CAT", "UNP"],
-    "Utilities": ["NEE"],
+    "Utilities": ["NEE", "POWERGRID.NS"],
     "Real Estate": ["AMT"],
     "India IT": ["TCS.NS", "INFY.NS", "WIPRO.NS"],
     "India Pharma": ["SUNPHARMA.NS"],
+    "Materials": ["LIN", "ULTRACEMCO.NS", "TATASTEEL.NS"],
+    "India FMCG": ["ITC.NS", "HINDUNILVR.NS"],
     "Benchmark": ["^GSPC", "^NSEI"],
 }
 
