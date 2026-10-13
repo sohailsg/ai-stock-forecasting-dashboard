@@ -77,6 +77,22 @@ def correlation_pairs(frames: dict[str, pd.DataFrame], k: int = 15) -> dict:
     return {"low": pairs[:k], "high": pairs[-k:][::-1]}
 
 
+def correlation_peers(frames: dict[str, pd.DataFrame], k: int = 8) -> dict:
+    """Per ticker: the k most- and k least-correlated other tickers.
+
+    Lets the page answer "what moves like the stock I picked?" for any pick
+    without shipping the full N×N matrix.
+    """
+    m = correlation_matrix(frames)
+    out: dict = {}
+    for a, row in m.items():
+        others = sorted(((b, v) for b, v in (row or {}).items() if b != a and v is not None),
+                        key=lambda x: x[1])
+        out[a] = {"high": [[b, v] for b, v in others[-k:][::-1]],
+                  "low": [[b, v] for b, v in others[:k]]}
+    return out
+
+
 def correlation_matrix(frames: dict[str, pd.DataFrame]) -> dict:
     """Correlation of daily returns across tickers (pairwise min_periods). (ST5.3)"""
     if len(frames) < 2:

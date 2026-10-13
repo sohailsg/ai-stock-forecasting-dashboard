@@ -80,6 +80,7 @@ def build_all() -> dict:
         "tickers": sorted(frames),
         "sectors": {t: sec.get_sector(t) for t in frames},
         "pairs": proc.correlation_pairs(frames),
+        "peers": proc.correlation_peers(frames),
         "insights": {},
         "generated_at": dt.datetime.now(dt.timezone.utc).isoformat(),
     }

@@ -414,6 +414,9 @@ function renderMarket() {
       document.getElementById("sector").value = state.sector;
       buildTickerOptions();
       renderInsightCharts();
+      renderMarket();
+      resetCmpToIndustry();
+      updateCompare().catch((e) => console.error(e));
       document.getElementById("sector").scrollIntoView({ behavior: "smooth", block: "center" });
     };
     div.addEventListener("click", pick);
@@ -423,6 +426,7 @@ function renderMarket() {
   // Ranking table by 1M change
   const rows = Object.entries(snap)
     .filter(([, v]) => v.change_1m != null)
+    .filter(([t, v]) => !state.sector || (v.sector || sectorOf(t)) === state.sector)
     .sort((a, b) => b[1].change_1m - a[1].change_1m);
   const tb = document.querySelector("#rank-table tbody");
   tb.innerHTML = "";
@@ -451,7 +455,7 @@ const CMP_COLORS = ["#4361ee", "#e63946", "#43aa8b"];
 function renderCmpPicks() {
   const wrap = document.getElementById("cmp-picks");
   wrap.innerHTML = "";
-  indexData.tickers.forEach((t) => {
+  indexData.tickers.filter((t) => !state.sector || sectorOf(t) === state.sector || state.cmp.includes(t)).forEach((t) => {
     const lab = document.createElement("label");
     lab.className = "pill";
     const cb = document.createElement("input");
@@ -480,6 +484,7 @@ async function ensureLoaded(t) {
 
 async function updateCompare() {
   renderCmpPicks();
+  renderPairs();
   if (cmpChart) { cmpChart.destroy(); cmpChart = null; }
   compareNarrative();
   if (!state.cmp.length) return;
@@ -519,6 +524,14 @@ async function updateCompare() {
   });
 }
 
+function resetCmpToIndustry() {
+  if (!state.sector) return;
+  const own = indexData.tickers.filter((t) => sectorOf(t) === state.sector);
+  const keep = state.cmp.filter((t) => sectorOf(t) === state.sector);
+  state.cmp = [...new Set([...keep, ...own])].slice(0, Math.max(2, keep.length)).slice(0, 3);
+  writeHash();
+}
+
 function comparePair(a, b) {
   state.cmp = [a, b];
   writeHash();
@@ -530,26 +543,39 @@ function comparePair(a, b) {
    Each list entry answers: "which two stocks move (least/most) together?" */
 
 function renderPairs() {
-  // Backend-computed pairs scale to 200+ tickers (no giant matrix in the page)
-  const stored = indexData.pairs;
-  const mk = (list, elId) => {
+  // Anchor = the companies being compared, else the stock being inspected.
+  const anchors = state.cmp.length ? state.cmp.slice(0, 3) : (state.ticker ? [state.ticker] : []);
+  const peers = indexData.peers || {};
+  const fill = (elId, kind) => {
     const ul = document.getElementById(elId);
     ul.innerHTML = "";
-    if (!list.length) { ul.innerHTML = "<li>Not enough data.</li>"; return; }
-    list.forEach(({ a, b, v }) => {
+    if (!anchors.length) { ul.innerHTML = "<li>Pick a company first.</li>"; return; }
+    anchors.forEach((a) => {
+      const list = (peers[a] && peers[a][kind]) || [];
       const li = document.createElement("li");
-      const btn = document.createElement("button");
-      btn.className = "btn";
-      btn.style.margin = "0.15rem 0";
-      btn.textContent = `${a} + ${b} (${v.toFixed(2)})`;
-      btn.title = `Compare ${a} vs ${b}`;
-      btn.addEventListener("click", () => comparePair(a, b));
-      li.appendChild(btn);
+      const h = document.createElement("strong");
+      h.textContent = nameOf(a);
+      li.appendChild(h);
+      if (!list.length) {
+        li.appendChild(document.createTextNode(" — relations appear after the next data refresh."));
+      }
+      list.forEach(([b, v]) => {
+        const btn = document.createElement("button");
+        btn.className = "btn";
+        btn.style.margin = "0.15rem 0.25rem 0.15rem 0";
+        btn.textContent = `${nameOf(b)} (${v.toFixed(2)})`;
+        btn.title = `Compare ${nameOf(a)} vs ${nameOf(b)} — ${sectorOf(b)}`;
+        btn.addEventListener("click", () => comparePair(a, b));
+        li.appendChild(document.createElement("br"));
+        li.appendChild(btn);
+      });
       ul.appendChild(li);
     });
   };
-  mk((stored && stored.low) || [], "pairs-low");
-  mk((stored && stored.high) || [], "pairs-high");
+  const who = anchors.map(nameOf).join(", ");
+  document.getElementById("pairs-title").textContent = who ? `Relation of ${who} with other companies` : "";
+  fill("pairs-high", "high");
+  fill("pairs-low", "low");
 }
 
 /* ── Analyst insight charts: one question per graph ─────────────────────── */
@@ -700,6 +726,9 @@ async function init() {
       state.sector = secSel.value;
       buildTickerOptions();
       renderInsightCharts();
+      renderMarket();
+      resetCmpToIndustry();
+      updateCompare().catch((e) => console.error(e));
       if (state.ticker) selectTicker(state.ticker).catch((e) => showError(e));
     });
     document.getElementById("search").addEventListener("input", (e) => {
@@ -732,7 +761,7 @@ async function init() {
     renderMarket();
     renderPairs();
     renderInsightCharts();
-    if (!state.cmp.length) state.cmp = [state.ticker, indexData.tickers.find((t) => t !== state.ticker)].filter(Boolean).slice(0, 2);
+    if (!state.cmp.length) state.cmp = [state.ticker, indexData.tickers.find((t) => t !== state.ticker && sectorOf(t) === sectorOf(state.ticker))].filter(Boolean).slice(0, 2);
     await selectTicker(state.ticker);
     await updateCompare();
   } catch (err) {

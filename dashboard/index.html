@@ -126,7 +126,7 @@
           <th style="text-align:left;padding:.4rem">#</th><th style="text-align:left">Ticker</th>
           <th style="text-align:left">Industry</th><th style="text-align:right">1M %</th>
           <th style="text-align:right">Vol</th><th style="text-align:right">Sharpe</th>
-          <th style="text-align:left">Backtest</th>
+          <th style="text-align:left">Forecast trust</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -141,14 +141,15 @@
     </section>
 
     <section class="chart-section" aria-label="Diversification">
-      <h2>Do they move together? <span class="tag">correlation of daily returns — click a pair to compare</span></h2>
+      <h2>Do they move together? <span class="tag">correlation of daily returns — click a company to compare</span></h2>
+      <p id="pairs-title" class="kpi-sub"></p>
       <div style="display:flex;flex-wrap:wrap;gap:1.5rem">
         <div style="flex:1;min-width:240px">
-          <h2>Best diversifiers <span class="tag">(lowest correlation)</span></h2>
+          <h2>Least related — diversifiers <span class="tag">(lowest correlation, across all industries)</span></h2>
           <ul class="clean" id="pairs-low"></ul>
         </div>
         <div style="flex:1;min-width:240px">
-          <h2>Move in lockstep <span class="tag">(highest correlation)</span></h2>
+          <h2>Moves together <span class="tag">(highest correlation, across all industries)</span></h2>
           <ul class="clean" id="pairs-high"></ul>
         </div>
       </div>
@@ -178,8 +179,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="theme.js"></script>
-  <script src="names.js?v=20261014d"></script>
-  <script src="stocks.js?v=20261014d"></script>
+  <script src="names.js?v=20261014e"></script>
+  <script src="stocks.js?v=20261014e"></script>
 
 </body>
 </html>

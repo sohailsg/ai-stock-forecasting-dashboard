@@ -77,6 +77,16 @@ def test_correlation_pairs_shape():
     assert all(p["a"] != p["b"] for p in pairs["low"] + pairs["high"])
 
 
+def test_correlation_peers_shape():
+    from src import process as proc
+
+    frames = {"A": _prices(60), "B": _prices(60), "C": _prices(60, base=50.0)}
+    peers = proc.correlation_peers(frames, k=1)
+    assert set(peers) == {"A", "B", "C"}
+    assert all(len(v["high"]) == 1 and len(v["low"]) == 1 for v in peers.values())
+    assert all(t not in [x[0] for x in v["high"] + v["low"]] for t, v in peers.items())
+
+
 def test_holdout_has_frontend_keys():
     df = _prices(200)
     r = bt.holdout(df, horizon=10)
