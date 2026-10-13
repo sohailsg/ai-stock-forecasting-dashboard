@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Interactive stock forecasting dashboard: ARIMA projections with honest backtests, anomaly flags and AI insights. Educational use only." />
+  <meta name="description" content="Compare 23 US and India stocks by industry: performance, risk vs reward, trend position and honest forecast backtests. Educational use only." />
   <title>Stock Forecasting Dashboard — sohail-ahmed.space</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -18,20 +18,29 @@
   <main>
     <div class="banner" id="stale-banner" role="alert"></div>
 
-    <section class="chart-section" aria-label="Controls">
+    <!-- STEP 1: industry first — never overwhelm with 23 names at once -->
+    <section class="chart-section" aria-label="Step 1: pick an industry">
+      <h2>Step 1 — Pick an industry <span class="tag">(avg 1-month change)</span></h2>
+      <div class="kpi-cards" id="sector-cards"></div>
       <div class="controls">
-        <label for="sector"><span class="group-label">Sector</span>
-          <select id="sector"><option value="">All sectors</option></select>
-        </label>
-        <label for="ticker"><span class="group-label">Ticker</span>
-          <select id="ticker"></select>
-        </label>
-        <label for="search"><span class="group-label">Search</span>
-          <input type="search" id="search" placeholder="e.g. RELIANCE" autocomplete="off" />
+        <label for="search"><span class="group-label">Or find a company</span>
+          <input type="search" id="search" placeholder="e.g. RELIANCE, NVIDIA…" autocomplete="off" />
         </label>
       </div>
+    </section>
+
+    <!-- STEP 2: one company deep dive -->
+    <section class="chart-section" aria-label="Step 2: pick a company">
+      <h2>Step 2 — Pick a company</h2>
+      <div class="controls">
+        <label for="sector"><span class="group-label">Industry</span>
+          <select id="sector"><option value="">All industries</option></select>
+        </label>
+        <label for="ticker"><span class="group-label">Company</span>
+          <select id="ticker"></select>
+        </label>
         <div class="group" role="group" aria-label="History range">
-          <span class="group-label">Range</span>
+          <span class="group-label">History</span>
           <button class="btn range-btn" data-range="30">1M</button>
           <button class="btn range-btn" data-range="180">6M</button>
           <button class="btn range-btn" data-range="365">1Y</button>
@@ -74,20 +83,40 @@
       <h2>AI Insight <span class="tag">(AI-generated, educational only)</span></h2>
       <p id="ai-insight">Loading…</p>
       <p class="kpi-sub" id="ai-tag">Forecast reliability: —</p>
-      <h2 style="margin-top:1.25rem">Recent anomalies</h2>
+      <h2 style="margin-top:1.25rem">Recent anomalies <span class="tag">(unusual daily moves)</span></h2>
       <ul class="clean" id="anomaly-list"><li>Loading…</li></ul>
     </section>
 
-    <section class="chart-section" aria-label="Market overview">
-      <h2>Suggest &amp; Compare <span class="tag">(all 12 stocks, educational only)</span></h2>
+    <!-- STEP 3: analyst insight charts — each answers one question -->
+    <section class="chart-section" aria-label="Market insights">
+      <h2>Step 3 — Read the market <span class="tag">(all stocks in view)</span></h2>
       <p id="market-insight">Loading…</p>
-      <div class="kpi-cards" id="sector-cards" style="margin:1rem 0 0"></div>
-      <h2 style="margin-top:1.25rem">Ranking <span class="tag">(by 1-month change)</span></h2>
+    </section>
+
+    <section class="chart-section" aria-label="Performance chart">
+      <h2>Who's winning? <span class="tag">return, last 30 days, % — ★ = market index</span></h2>
+      <div class="chart-wrap"><canvas id="chart-perf"></canvas></div>
+    </section>
+
+    <section class="chart-section" aria-label="Risk versus reward chart">
+      <h2>Is the reward worth the risk? <span class="tag">top-right = high return, low volatility (best)</span></h2>
+      <div class="chart-wrap"><canvas id="chart-risk"></canvas></div>
+    </section>
+
+    <section class="chart-section" aria-label="Position charts">
+      <h2>How far from the top? <span class="tag">distance below 52-week high, % — dip candidates on the right</span></h2>
+      <div class="chart-wrap"><canvas id="chart-high"></canvas></div>
+      <h2 style="margin-top:1.25rem">Above or below trend? <span class="tag">distance from 50-day average, % — green = uptrend</span></h2>
+      <div class="chart-wrap"><canvas id="chart-trend"></canvas></div>
+    </section>
+
+    <section class="chart-section" aria-label="Ranking">
+      <h2>Ranking <span class="tag">(by 1-month change — click a ticker to inspect)</span></h2>
       <div style="overflow-x:auto">
       <table id="rank-table" style="width:100%;border-collapse:collapse;font-size:.88rem;font-variant-numeric:tabular-nums">
         <thead><tr>
           <th style="text-align:left;padding:.4rem">#</th><th style="text-align:left">Ticker</th>
-          <th style="text-align:left">Sector</th><th style="text-align:right">1M %</th>
+          <th style="text-align:left">Industry</th><th style="text-align:right">1M %</th>
           <th style="text-align:right">Vol</th><th style="text-align:right">Sharpe</th>
           <th style="text-align:left">Backtest</th>
         </tr></thead>
@@ -97,14 +126,23 @@
     </section>
 
     <section class="chart-section" aria-label="Compare">
-      <h2>Compare <span class="tag">(rebased to 100, max 3)</span></h2>
+      <h2>Head-to-head <span class="tag">growth of 100 invested — pick up to 3</span></h2>
       <div class="toggles" id="cmp-picks" role="group" aria-label="Tickers to compare"></div>
       <div class="chart-wrap" style="margin-top:.75rem"><canvas id="chart-cmp"></canvas></div>
     </section>
 
-    <section class="chart-section" aria-label="Correlation heatmap">
-      <h2>Correlation heatmap <span class="tag">(daily returns; click a cell to compare)</span></h2>
-      <div style="overflow-x:auto"><table id="heatmap" style="border-collapse:collapse;font-size:.8rem;font-variant-numeric:tabular-nums"></table></div>
+    <section class="chart-section" aria-label="Diversification">
+      <h2>Do they move together? <span class="tag">correlation of daily returns — click a pair to compare</span></h2>
+      <div style="display:flex;flex-wrap:wrap;gap:1.5rem">
+        <div style="flex:1;min-width:240px">
+          <h2>Best diversifiers <span class="tag">(lowest correlation)</span></h2>
+          <ul class="clean" id="pairs-low"></ul>
+        </div>
+        <div style="flex:1;min-width:240px">
+          <h2>Move in lockstep <span class="tag">(highest correlation)</span></h2>
+          <ul class="clean" id="pairs-high"></ul>
+        </div>
+      </div>
     </section>
   </main>
 

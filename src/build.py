@@ -49,6 +49,7 @@ def build_ticker(ticker: str, df: pd.DataFrame) -> dict:
         "ticker": ticker,
         "schema_version": SCHEMA_VERSION,
         "generated_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "currency": sec.get_currency(ticker),
         "dates": dates,
         "close": [_clean_num(v) for v in feat["close"]],
         "ma20": [_clean_num(v) for v in feat["ma20"]],
@@ -87,11 +88,15 @@ def build_all() -> dict:
         d = json.loads((OUT_DIR / f"{t}.json").read_text())
         index["snapshot"][t] = {
             "sector": sec.get_sector(t),
+            "currency": sec.get_currency(t),
             "last_close": d["stats"].get("last_close"),
             "change_1m": d["stats"].get("change_1m"),
             "volatility": d["stats"].get("volatility"),
             "sharpe": d["stats"].get("sharpe"),
             "max_drawdown": d["stats"].get("max_drawdown"),
+            "pct_off_high": d["stats"].get("pct_off_high"),
+            "dist_ma50_pct": d["stats"].get("dist_ma50_pct"),
+            "above_ma50": d["stats"].get("above_ma50"),
             "verdict": d["backtest"].get("verdict"),
             "model_mape": d["backtest"].get("model_mape"),
             "anomalies": len(d.get("anomalies", [])),

@@ -7,9 +7,21 @@ const EXPECTED_SCHEMA = 1;
 
 let chart = null;
 let cmpChart = null;
+const insightCharts = [];
 const state = { ticker: "", range: 365, showMA20: true, showMA50: true, showFc: true, showAn: true, fcDays: 30, cmp: [], sector: "", q: "" };
 let cache = {};
 let indexData = null;
+
+function symOf(t) {
+  const code = (indexData.snapshot && indexData.snapshot[t] && indexData.snapshot[t].currency)
+    || (cache[t] && cache[t].currency) || "USD";
+  return code === "INR" ? "₹" : "$";
+}
+
+function fmtMoney(v, t) {
+  if (v == null) return "—";
+  return symOf(t) + Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
 
 async function loadJSON(path) {
   const r = await fetch(path);
@@ -110,15 +122,16 @@ function render(payload) {
             label: (ctx) => {
               const v = ctx.parsed.y;
               if (v == null) return null;
-              if (ctx.dataset.label === "Anomaly") return ` Anomaly: $${v.toFixed(2)}`;
-              return ` ${ctx.dataset.label}: $${v.toFixed(2)}`;
+              const s = symOf(payload.ticker);
+              if (ctx.dataset.label === "Anomaly") return ` Anomaly: ${s}${v.toFixed(2)}`;
+              return ` ${ctx.dataset.label}: ${s}${v.toFixed(2)}`;
             },
           },
         },
       },
       scales: {
-        x: { ticks: { maxTicksLimit: 10, maxRotation: 0 } },
-        y: { beginAtZero: false, ticks: { callback: (v) => `$${v}` } },
+        x: { ticks: { maxTicksLimit: 10, maxRotation: 0 }, title: { display: true, text: "Date" } },
+        y: { beginAtZero: false, ticks: { callback: (v) => `${symOf(payload.ticker)}${v.toLocaleString()}` }, title: { display: true, text: `Price (${symOf(payload.ticker) === "₹" ? "INR" : "USD"})` } },
       },
     },
   });
@@ -129,7 +142,7 @@ function render(payload) {
     el.classList.remove("loading");
     el.textContent = txt;
   };
-  set("kpi-close", `$${st.last_close.toLocaleString()}`);
+  set("kpi-close", fmtMoney(st.last_close, payload.ticker));
   set("kpi-chg", `${st.change_1m > 0 ? "+" : ""}${st.change_1m}%`);
   set("kpi-vol", st.volatility ?? "—");
   set("kpi-sharpe", st.sharpe ?? "—");
@@ -148,7 +161,8 @@ function render(payload) {
   if (!anomalies.length) ul.innerHTML = "<li>No anomalies flagged in this window.</li>";
   anomalies.slice(0, 10).forEach((a) => {
     const li = document.createElement("li");
-    li.textContent = `${a.date}: $${a.price} (${a.return_pct > 0 ? "+" : ""}${a.return_pct}%, z=${a.z})`;
+    const s = symOf(payload.ticker);
+    li.textContent = `${a.date}: ${s}${a.price} (${a.return_pct > 0 ? "+" : ""}${a.return_pct}%, z=${a.z})`;
     ul.appendChild(li);
   });
   if (indexData.snapshot) renderMarket();
@@ -254,10 +268,23 @@ function renderMarket() {
     const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
     const div = document.createElement("div");
     div.className = "card";
+    div.style.cursor = "pointer";
+    div.setAttribute("role", "button");
+    div.tabIndex = 0;
+    div.title = `Filter to ${s}`;
     div.innerHTML = `<h2></h2><p class="kpi-value" style="font-size:1.25rem"></p><p class="kpi-sub"></p>`;
     div.querySelector("h2").textContent = s;
     div.querySelector(".kpi-value").textContent = `${avg > 0 ? "+" : ""}${avg.toFixed(1)}%`;
-    div.querySelector(".kpi-sub").textContent = `${arr.length} stock${arr.length > 1 ? "s" : ""} · avg 1M`;
+    div.querySelector(".kpi-sub").textContent = `${arr.length} stock${arr.length > 1 ? "s" : ""} · avg 1M — click to filter`;
+    const pick = () => {
+      state.sector = state.sector === s ? "" : s;
+      document.getElementById("sector").value = state.sector;
+      buildTickerOptions();
+      renderInsightCharts();
+      document.getElementById("sector").scrollIntoView({ behavior: "smooth", block: "center" });
+    };
+    div.addEventListener("click", pick);
+    div.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } });
     wrap.appendChild(div);
   });
   // Ranking table by 1M change
@@ -351,8 +378,8 @@ async function updateCompare() {
       interaction: { mode: "index", intersect: false },
       plugins: { legend: { position: "bottom" } },
       scales: {
-        x: { ticks: { maxTicksLimit: 8, maxRotation: 0 } },
-        y: { ticks: { callback: (v) => `${v}` }, title: { display: true, text: "Rebased = 100" } },
+        x: { ticks: { maxTicksLimit: 8, maxRotation: 0 }, title: { display: true, text: "Date" } },
+        y: { ticks: { callback: (v) => `${v}` }, title: { display: true, text: "Growth of 100 invested" } },
       },
     },
   });
@@ -365,37 +392,157 @@ function comparePair(a, b) {
   document.getElementById("chart-cmp").scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
-/* ── Correlation heatmap ─────────────────────────────────────────────────── */
+/* ── Diversification pairs (heatmap replacement) ─────────────────────────
+   Each list entry answers: "which two stocks move (least/most) together?" */
 
-function heatColor(v) {
-  // -1..1 → red..neutral..green
-  const a = Math.abs(v);
-  const bg = v >= 0 ? `rgba(30,158,106,${(0.08 + a * 0.55).toFixed(2)})`
-                    : `rgba(230,57,70,${(0.08 + a * 0.55).toFixed(2)})`;
-  return bg;
-}
-
-function renderHeatmap() {
+function allPairs() {
   const corr = indexData.correlations || {};
   const ts = indexData.tickers;
-  const tbl = document.getElementById("heatmap");
-  tbl.innerHTML = "";
-  const head = document.createElement("tr");
-  head.innerHTML = "<th></th>" + ts.map((t) => `<th>${t}</th>`).join("");
-  tbl.appendChild(head);
-  ts.forEach((r) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<th>${r}</th>` + ts.map((c) => {
-      const v = corr[r] && corr[r][c];
-      const txt = v == null ? "—" : v.toFixed(2);
-      const style = v == null ? "" : ` style="background:${heatColor(v)}"`;
-      return `<td class="cell" data-r="${r}" data-c="${c}"${style} title="${r} vs ${c}: ${txt}">${txt}</td>`;
-    }).join("");
-    tbl.appendChild(tr);
-  });
-  tbl.querySelectorAll("td.cell").forEach((td) => td.addEventListener("click", () => {
-    if (td.dataset.r !== td.dataset.c) comparePair(td.dataset.r, td.dataset.c);
-  }));
+  const out = [];
+  for (let i = 0; i < ts.length; i++) {
+    for (let j = i + 1; j < ts.length; j++) {
+      const v = corr[ts[i]] && corr[ts[i]][ts[j]];
+      if (v != null) out.push({ a: ts[i], b: ts[j], v });
+    }
+  }
+  return out.sort((x, y) => x.v - y.v);
+}
+
+function renderPairs() {
+  const pairs = allPairs();
+  const mk = (list, elId) => {
+    const ul = document.getElementById(elId);
+    ul.innerHTML = "";
+    if (!list.length) { ul.innerHTML = "<li>Not enough data.</li>"; return; }
+    list.forEach(({ a, b, v }) => {
+      const li = document.createElement("li");
+      const btn = document.createElement("button");
+      btn.className = "btn";
+      btn.style.margin = "0.15rem 0";
+      btn.textContent = `${a} + ${b} (${v.toFixed(2)})`;
+      btn.title = `Compare ${a} vs ${b}`;
+      btn.addEventListener("click", () => comparePair(a, b));
+      li.appendChild(btn);
+      ul.appendChild(li);
+    });
+  };
+  mk(pairs.slice(0, 5), "pairs-low");
+  mk(pairs.slice(-5).reverse(), "pairs-high");
+}
+
+/* ── Analyst insight charts: one question per graph ─────────────────────── */
+
+function inView() {
+  // Stocks currently in view (sector filter applies; benchmarks marked ★)
+  return Object.entries(indexData.snapshot || {})
+    .filter(([, v]) => v.change_1m != null)
+    .filter(([t]) => !state.sector || (indexData.snapshot[t].sector || sectorOf(t)) === state.sector);
+}
+
+function killInsights() {
+  insightCharts.forEach((c) => c.destroy());
+  insightCharts.length = 0;
+}
+
+function isBench(t) {
+  return sectorOf(t) === "Benchmark";
+}
+
+function renderInsightCharts() {
+  killInsights();
+  const rows = inView();
+  if (!rows.length) return;
+  const dark = document.documentElement.dataset.theme === "dark";
+  const up = dark ? "#5fd6b5" : "#1e9e6a";
+  const down = "#e63946";
+  const gray = "#9aa4b2";
+
+  // 1. Who's winning? — 1M return bars, sorted
+  {
+    const sorted = [...rows].sort((a, b) => a[1].change_1m - b[1].change_1m);
+    const labels = sorted.map(([t]) => t + (isBench(t) ? " ★" : ""));
+    insightCharts.push(new Chart(document.getElementById("chart-perf"), {
+      type: "bar",
+      data: { labels, datasets: [{ data: sorted.map(([, v]) => v.change_1m),
+        backgroundColor: sorted.map(([, v]) => (v.change_1m >= 0 ? up : down)), borderRadius: 4 } ] },
+      options: { indexAxis: "y", responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false },
+          tooltip: { callbacks: { label: (c) => ` 1M return: ${c.parsed.x > 0 ? "+" : ""}${c.parsed.x}%` } } },
+        scales: {
+          x: { title: { display: true, text: "Return, last 30 days (%)" } },
+          y: { title: { display: true, text: "Stock" } },
+        } },
+    }));
+  }
+
+  // 2. Risk vs reward — scatter, labelled points
+  {
+    const pts = rows.map(([t, v]) => ({ x: v.volatility, y: v.change_1m, t }));
+    const labelPlugin = {
+      id: "ptlabels",
+      afterDatasetsDraw(c) {
+        const ctx = c.ctx;
+        ctx.save();
+        ctx.font = "11px system-ui, sans-serif";
+        ctx.fillStyle = dark ? "#eef1f6" : "#1c1c28";
+        const meta = c.getDatasetMeta(0);
+        meta.data.forEach((p, i) => { ctx.fillText(pts[i].t, p.x + 6, p.y - 6); });
+        ctx.restore();
+      },
+    };
+    insightCharts.push(new Chart(document.getElementById("chart-risk"), {
+      type: "scatter",
+      data: { datasets: [{ data: pts,
+        backgroundColor: pts.map((p) => (isBench(p.t) ? gray : (p.y >= 0 ? up : down))),
+        pointRadius: 6, pointHoverRadius: 8 }] },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false },
+          tooltip: { callbacks: { label: (c) => ` ${c.raw.t}: ${c.raw.y > 0 ? "+" : ""}${c.raw.y}% return, ${c.raw.x} vol` } } },
+        scales: {
+          x: { title: { display: true, text: "Risk — annualized volatility (σ)" } },
+          y: { title: { display: true, text: "Reward — return, last 30 days (%)" } },
+        } },
+      plugins: [labelPlugin],
+    }));
+  }
+
+  // 3. How far from the top? — distance below 52w high
+  {
+    const sorted = rows.filter(([, v]) => v.pct_off_high != null)
+      .sort((a, b) => a[1].pct_off_high - b[1].pct_off_high);
+    insightCharts.push(new Chart(document.getElementById("chart-high"), {
+      type: "bar",
+      data: { labels: sorted.map(([t]) => t + (isBench(t) ? " ★" : "")),
+        datasets: [{ data: sorted.map(([, v]) => v.pct_off_high),
+          backgroundColor: sorted.map(([, v]) => (v.pct_off_high > -10 ? up : down)), borderRadius: 4 }] },
+      options: { indexAxis: "y", responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false },
+          tooltip: { callbacks: { label: (c) => ` ${c.parsed.x}% below 52-week high` } } },
+        scales: {
+          x: { title: { display: true, text: "Distance below 52-week high (%)" }, reverse: true },
+          y: { title: { display: true, text: "Stock" } },
+        } },
+    }));
+  }
+
+  // 4. Above or below trend? — distance from MA50
+  {
+    const sorted = rows.filter(([, v]) => v.dist_ma50_pct != null)
+      .sort((a, b) => a[1].dist_ma50_pct - b[1].dist_ma50_pct);
+    insightCharts.push(new Chart(document.getElementById("chart-trend"), {
+      type: "bar",
+      data: { labels: sorted.map(([t]) => t + (isBench(t) ? " ★" : "")),
+        datasets: [{ data: sorted.map(([, v]) => v.dist_ma50_pct),
+          backgroundColor: sorted.map(([, v]) => (v.dist_ma50_pct >= 0 ? up : down)), borderRadius: 4 }] },
+      options: { indexAxis: "y", responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false },
+          tooltip: { callbacks: { label: (c) => ` ${c.parsed.x > 0 ? "+" : ""}${c.parsed.x}% ${c.parsed.x >= 0 ? "above" : "below"} the 50-day average` } } },
+        scales: {
+          x: { title: { display: true, text: "Distance from 50-day average (%)" } },
+          y: { title: { display: true, text: "Stock" } },
+        } },
+    }));
+  }
 }
 
 async function init() {
@@ -422,6 +569,7 @@ async function init() {
     secSel.addEventListener("change", () => {
       state.sector = secSel.value;
       buildTickerOptions();
+      renderInsightCharts();
       if (state.ticker) selectTicker(state.ticker).catch((e) => showError(e));
     });
     document.getElementById("search").addEventListener("input", (e) => {
@@ -447,11 +595,13 @@ async function init() {
     document.getElementById("btn-png").addEventListener("click", currentPNG);
     window.__onThemeChange = () => {
       if (cache[state.ticker]) render(cache[state.ticker]);
+      renderInsightCharts();
       if (state.cmp.length) updateCompare().catch((e) => console.error(e));
     };
     setControls();
     renderMarket();
-    renderHeatmap();
+    renderPairs();
+    renderInsightCharts();
     if (!state.cmp.length) state.cmp = [state.ticker, indexData.tickers.find((t) => t !== state.ticker)].filter(Boolean).slice(0, 2);
     await selectTicker(state.ticker);
     await updateCompare();

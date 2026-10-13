@@ -89,15 +89,19 @@ def test_nan_to_null_in_json():
     assert json.dumps({"x": _clean_num(float("nan"))}) == '{"x": null}'
 
 
-def test_sector_universe_is_12_us_india():
+def test_sector_universe_is_us_india():
     from src import sectors as sec
 
-    assert len(sec.DEFAULT_TICKERS) == 12
+    assert len(sec.DEFAULT_TICKERS) == 23
     assert "RELIANCE.NS" in sec.DEFAULT_TICKERS
     assert "AAPL" in sec.DEFAULT_TICKERS
+    assert "^GSPC" in sec.DEFAULT_TICKERS
     assert sec.get_sector("NVDA") == "Semiconductors"
     assert sec.get_sector("TCS.NS") == "India IT"
+    assert sec.get_sector("^NSEI") == "Benchmark"
     assert sec.get_sector("UNKNOWN.X") == "Other"
+    assert sec.get_currency("INFY.NS") == "INR"
+    assert sec.get_currency("MSFT") == "USD"
 
 
 def test_fetch_defaults_to_sector_universe(monkeypatch):
@@ -107,7 +111,15 @@ def test_fetch_defaults_to_sector_universe(monkeypatch):
 
     monkeypatch.delenv("TICKERS", raising=False)
     assert fet.get_tickers() == list(fet.DEFAULT_TICKERS)
-    assert len(fet.get_tickers()) == 12
+    assert len(fet.get_tickers()) == 23
+
+
+def test_position_metrics_known():
+    df = _prices(300)
+    m = proc.risk_metrics(df)
+    assert m["pct_off_high"] == 0.0  # monotonic rise: at the high
+    assert m["above_ma50"] is True
+    assert m["dist_ma50_pct"] is not None and m["dist_ma50_pct"] > 0
 
 
 def test_insights_fallback_persists_to_index(tmp_path, monkeypatch):

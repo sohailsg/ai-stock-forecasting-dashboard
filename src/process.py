@@ -29,12 +29,32 @@ def risk_metrics(df: pd.DataFrame) -> dict:
     max_dd = float(dd.min()) if len(dd) else None
     last = float(feat["close"].iloc[-1])
     m1 = float(feat["close"].iloc[-1] / feat["close"].iloc[-22] - 1) if len(feat) >= 22 else None
+    pos = position_metrics(feat)
     return {
         "last_close": round(last, 2),
         "change_1m": round(m1 * 100, 2) if m1 is not None else None,
         "volatility": round(vol, 4) if vol is not None else None,
         "sharpe": round(sharpe, 3) if sharpe is not None else None,
         "max_drawdown": round(max_dd * 100, 2) if max_dd is not None else None,
+        **pos,
+    }
+
+
+def position_metrics(feat: pd.DataFrame) -> dict:
+    """Where price sits: vs 52-week high and vs MA50 trend. (analyst positioning)"""
+    close = feat["close"]
+    last = float(close.iloc[-1])
+    tail = close.iloc[-252:] if len(close) >= 252 else close
+    high52 = float(tail.max())
+    pct_off_high = round((last / high52 - 1) * 100, 2) if high52 else None
+    ma50 = float(feat["ma50"].iloc[-1]) if not pd.isna(feat["ma50"].iloc[-1]) else None
+    dist_ma50 = round((last / ma50 - 1) * 100, 2) if ma50 else None
+    above_ma50 = bool(last > ma50) if ma50 else None
+    return {
+        "high_52w": round(high52, 2),
+        "pct_off_high": pct_off_high,
+        "dist_ma50_pct": dist_ma50,
+        "above_ma50": above_ma50,
     }
 
 

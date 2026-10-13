@@ -5,8 +5,8 @@ Live: **https://sohail-ahmed.space/**
 > Educational only, not financial advice. Market data: Yahoo Finance via
 > yfinance (unofficial).
 
-Interactive stock analytics for 12 US + India stocks across 9 sectors
-(tech, chips, EV, finance, consumer, energy, India IT/bank/energy):
+Interactive stock analytics for 23 US + India stocks and indexes across 9 industries
+(tech, chips, EV, finance, healthcare, consumer, energy, India IT/bank/energy):
 daily fetch → MA20/50, volatility, Sharpe, drawdown → ARIMA(1,1,1) 30-day
 forecast with 95% band → honest backtest vs naive → z-score anomalies →
 Gemini insights + market overview → Chart.js UI with sector filter, search,
@@ -28,7 +28,7 @@ uv run main.py
 python -m http.server 8000   # open http://localhost:8000/dashboard/
 ```
 
-Env: `TICKERS` (default 12 US+India sector set, see `src/sectors.py`),
+Env: `TICKERS` (default 23 US+India industry set, see `src/sectors.py`),
 `FORECAST_HORIZON` (default 30), `GEMINI_API_KEY`.
 
 ---
@@ -61,7 +61,7 @@ Env: `TICKERS` (default 12 US+India sector set, see `src/sectors.py`),
 
 ## Features
 
-- **12 stocks, 9 sectors:** US tech/chips/EV/finance/consumer/energy + India IT/bank/energy
+- **23 stocks, indexes, 9 industries:** US tech/chips/EV/finance/health/consumer/energy + India IT/bank/energy/auto + S&P 500 & Nifty 50 benchmarks
 - **Forecasts with honesty:** every ticker shows model MAPE vs naive MAPE + verdict
 - **Compare mode:** overlay up to 3 tickers rebased to 100, shareable via URL hash
 - **Correlation heatmap:** click a cell to compare that pair
