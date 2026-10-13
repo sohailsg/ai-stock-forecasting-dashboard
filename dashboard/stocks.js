@@ -294,97 +294,117 @@ function liveInsight(payload, s, w) {
   const recentN = Math.min(10, n - 1);
   const recent = pc(last, closes[n - 1 - recentN]);
   const own1m = pc(last, closes[Math.max(0, n - 22)]);
+  const up = w.change > 0;
 
-  // Context: industry, market, closest co-movers (1M figures from the snapshot)
-  const snap = indexData.snapshot || {};
+  // Knowledge + peer context
   const sec = sectorOf(t);
+  const ind = INDUSTRY[sec] || null;
+  const co = companyFacts(t);
+  const snap = indexData.snapshot || {};
   const mates = Object.entries(snap).filter(([k, v]) => k !== t && v.change_1m != null && (v.sector || sectorOf(k)) === sec);
   const indAvg = mates.length ? mates.reduce((a, [, v]) => a + v.change_1m, 0) / mates.length : null;
   const rank = mates.length ? 1 + mates.filter(([, v]) => v.change_1m > own1m).length : null;
+  const matesUp = mates.filter(([, v]) => v.change_1m > 0).length;
+  const volMates = mates.filter(([, v]) => v.volatility != null).map(([, v]) => v.volatility);
+  const indVol = volMates.length ? volMates.reduce((a, b) => a + b, 0) / volMates.length : null;
   const inr = snap[t] && snap[t].currency === "INR";
   const mkt = snap[inr ? "^NSEI" : "^GSPC"];
   const mktName = inr ? "India's NIFTY 50" : "the S&P 500";
   const peers = ((indexData.peers || {})[t] || {}).high || [];
   const twin = peers.find(([b]) => snap[b] && snap[b].change_1m != null && !isBench(b));
+  const gap = indAvg == null ? null : own1m - indAvg;
+  const tide = gap != null && Math.abs(gap) < 2.5;
 
-  // 1. What is actually going on (regime)
-  const up = w.change > 0;
+  const out = [];
+
+  // 1. What the price is doing
   let regime, why;
   if (Math.abs(w.change) < 3) {
-    regime = `${nm} has gone nowhere over the ${rn} (${f1(w.change)}), a market that cannot decide`;
+    regime = `${nm} has gone nowhere over the ${rn} (${f1(w.change)})`;
     why = w.volatility != null && w.volatility > 0.3
-      ? "yet it swung hard along the way, so the flat result hides a real tug-of-war between buyers and sellers"
-      : "and it did so quietly, a sign of little new information or interest";
+      ? "yet it swung hard on the way, so the flat result hides a real tug-of-war between buyers and sellers"
+      : "and it did so quietly, a sign that little new information is reaching the price";
   } else if (up && recent >= 0 && (ma20 == null || last >= ma20)) {
-    regime = `${nm} is in a healthy uptrend: ${f1(w.change)} over the ${rn} and still rising (${f1(recent)} in the last ${recentN} sessions)`;
-    why = secondHalf > firstHalf
-      ? "the climb is accelerating rather than fading, which usually means buyers are still arriving"
-      : "the pace has cooled versus the first half, but the direction has not broken";
+    regime = `${nm} is climbing: ${f1(w.change)} over the ${rn}, still ${f1(recent)} in the last ${recentN} sessions`;
+    why = secondHalf > firstHalf ? "and the pace is quickening, so buyers are still arriving" : "although the pace has cooled from the first half, the direction has not broken";
   } else if (up) {
-    regime = `${nm} gained ${Math.abs(w.change).toFixed(1)}% over the ${rn}, but the rally is losing steam (${f1(recent)} lately${ma20 != null && last < ma20 ? ", and price has slipped under its 20-day average" : ""})`;
-    why = "gains that stall near the highs often mean early buyers are taking profit";
+    regime = `${nm} gained ${Math.abs(w.change).toFixed(1)}% over the ${rn}, but the rally is stalling (${f1(recent)} lately${ma20 != null && last < ma20 ? ", below its 20-day average" : ""})`;
+    why = "gains that stall like this often mean early buyers are taking profit";
   } else if (recent > 2 && (ma20 == null || last >= ma20)) {
-    regime = `${nm} fell ${Math.abs(w.change).toFixed(1)}% over the ${rn}, but is now trying to bounce (${f1(recent)} in ${recentN} sessions, back above its 20-day average)`;
-    why = ma50 != null && last < ma50
-      ? "the 50-day average above it is the first real test; until price clears it, this is a rebound inside a downtrend"
-      : "reclaiming both averages would turn this from a bounce into a recovery";
+    regime = `${nm} fell ${Math.abs(w.change).toFixed(1)}% over the ${rn} but is bouncing (${f1(recent)} in ${recentN} sessions)`;
+    why = ma50 != null && last < ma50 ? "it still has to clear the 50-day average, so for now this is a rebound inside a downtrend" : "holding above both averages would turn the bounce into a recovery";
   } else {
-    regime = `${nm} is in a downtrend: ${f1(w.change)} over the ${rn}${ma50 != null && last < ma50 ? " and below its 50-day average" : ""}`;
-    why = recent < 0
-      ? `the slide has not paused (${f1(recent)} in the last ${recentN} sessions), so sellers still control the tape`
-      : "the latest sessions are steadier, which may be the first sign of selling pressure fading";
+    regime = `${nm} is sliding: ${f1(w.change)} over the ${rn}${ma50 != null && last < ma50 ? ", under its 50-day average" : ""}`;
+    why = recent < 0 ? `and it has not paused (${f1(recent)} in the last ${recentN} sessions)` : "though the latest sessions are steadier, the first hint that selling is easing";
+  }
+  out.push(`${regime} — ${why}.`);
+
+  // 2. The business behind the chart + why this move makes sense for it
+  if (co && ind) {
+    const reason = up ? ind.up : ind.down;
+    if (tide) {
+      out.push(`${nm} ${co.what}. Its last month (${f1(own1m)}) matched the rest of ${sec} (${f1(indAvg)} on average; ${matesUp} of ${mates.length} peers rose), so the explanation is most likely industry-wide, since stocks in this industry tend to move on ${reason}. What sets ${nm} apart is that ${co.hinge}. Industry drivers to track: ${ind.watch}.`);
+    } else if (gap > 0) {
+      out.push(`${nm} ${co.what}, and ${co.hinge}. It beat its ${sec} peers by ${gap.toFixed(1)} points over the last month (${f1(own1m)} vs ${f1(indAvg)}, #${rank} of ${mates.length + 1}), which is company-specific strength rather than a rising tide; the most plausible source is whichever part of that story improved, since the wider industry only managed ${f1(indAvg)}.`);
+    } else {
+      out.push(`${nm} ${co.what}, and ${co.hinge}. It trailed its ${sec} peers by ${Math.abs(gap).toFixed(1)} points over the last month (${f1(own1m)} vs ${f1(indAvg)}, #${rank} of ${mates.length + 1}), so the problem is more likely inside the company than across the industry; the first place to look is the company-specific story above, not the industry-wide drivers.`);
+    }
+  } else if (ind) {
+    out.push(`${sec} ${ind.engine}; moves in it usually trace to ${up ? ind.up : ind.down}.`);
   }
 
-  // 2. Quality of the move: earned smoothly or violently?
-  let quality = "";
+  // 3. Quality of the move relative to what is normal for this industry
   if (w.sharpe != null && w.volatility != null) {
-    if (up && w.sharpe > 1) quality = `The gain came smoothly (Sharpe ${w.sharpe.toFixed(2)}), so holders were paid well for the risk they carried.`;
-    else if (up && w.sharpe > 0) quality = `The gain was real but bumpy: volatility of ${w.volatility.toFixed(2)} ate most of the reward (Sharpe ${w.sharpe.toFixed(2)}).`;
-    else if (!up && w.drawdown < -20) quality = `The damage was deep: at worst it sat ${Math.abs(w.drawdown).toFixed(0)}% below an earlier peak, and recovering from that needs a ${(100 / (1 + w.drawdown / 100) - 100).toFixed(0)}% rise just to get back to even.`;
-    else quality = `Risk was not rewarded here (Sharpe ${w.sharpe.toFixed(2)}).`;
+    let q;
+    const rel = indVol ? w.volatility / indVol : null;
+    const relTxt = "";
+    const relSent = rel == null ? "" : rel > 1.3 ? ` It is ${rel.toFixed(1)}x as jumpy as the typical ${sec} stock.` : rel < 0.75 ? ` It is calmer than the typical ${sec} stock.` : "";
+    if (up && w.sharpe > 1) q = `The gain was efficient (Sharpe ${w.sharpe.toFixed(2)}${relTxt}), so holders were paid well for the risk.`;
+    else if (up && w.sharpe > 0) q = `The gain was real but costly in nerves: volatility of ${w.volatility.toFixed(2)}${relTxt} absorbed most of the reward (Sharpe ${w.sharpe.toFixed(2)}).`;
+    else if (!up && w.drawdown < -20) q = `The fall was deep: at its worst it sat ${Math.abs(w.drawdown).toFixed(0)}% below an earlier peak, which needs a ${(100 / (1 + w.drawdown / 100) - 100).toFixed(0)}% rise just to get back to even${relTxt}.`;
+    else q = `Holders were not paid for the risk (Sharpe ${w.sharpe.toFixed(2)}${relTxt}).`;
+    out.push(q + relSent);
   }
 
-  // 3. Company or tide? Industry, market, closest co-mover
-  const ctx = [];
-  if (indAvg != null) {
-    const gap = own1m - indAvg;
-    ctx.push(Math.abs(gap) < 2
-      ? `Over the last month it moved in step with the rest of ${sec} (${f1(own1m)} vs ${f1(indAvg)} average), so this is mostly an industry-wide story, not something unique to the company`
-      : gap > 0
-        ? `Over the last month it beat its ${sec} peers by ${gap.toFixed(1)} points (${f1(own1m)} vs ${f1(indAvg)}), ranking #${rank} of ${mates.length + 1}, which points to company-specific strength rather than a rising tide`
-        : `Over the last month it lagged its ${sec} peers by ${Math.abs(gap).toFixed(1)} points (${f1(own1m)} vs ${f1(indAvg)}), ranking #${rank} of ${mates.length + 1}, so the weakness looks company-specific, not a sector problem`);
+  // 4. Cross-checks: market and closest co-mover
+  const cross = [];
+  if (mkt && mkt.change_1m != null) {
+    const rel = own1m - mkt.change_1m;
+    cross.push(`against ${mktName} (${f1(mkt.change_1m)}), it ${rel >= 0 ? "outran" : "lagged"} the market by ${Math.abs(rel).toFixed(1)} points`);
   }
-  if (mkt && mkt.change_1m != null) ctx.push(`${mktName} moved ${f1(mkt.change_1m)} in the same month`);
   if (twin) {
     const [b, c] = twin, bc = snap[b].change_1m;
-    ctx.push(`its closest co-mover is ${nameOf(b)} (correlation ${c.toFixed(2)}), ${Math.abs(bc) < 0.5 ? "which was roughly flat, so it gives no confirmation either way" : `which ${Math.sign(bc) === Math.sign(own1m) ? "confirms" : "contradicts"} the move by ${bc >= 0 ? "rising" : "falling"} ${Math.abs(bc).toFixed(1)}%`}`);
+    cross.push(`its closest co-mover, ${nameOf(b)} (correlation ${c.toFixed(2)}), ${Math.abs(bc) < 0.5 ? "was flat, so it neither confirms nor contradicts the move" : `${Math.sign(bc) === Math.sign(own1m) ? "confirms" : "contradicts"} it, ${bc >= 0 ? "up" : "down"} ${Math.abs(bc).toFixed(1)}%`}`);
   }
+  if (cross.length) out.push(`${cross[0][0].toUpperCase()}${cross[0].slice(1)}${cross.length > 1 ? `; ${cross[1]}` : ""}.`);
 
-  // 4. What to watch, and how far to trust the projection
+  // 5. Levels, and the biggest shock in terms of what is normal for this stock
   const watch = [];
   if (ma50 != null) {
     const lv = `${sym}${ma50.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-    watch.push(last >= ma50 ? `the 50-day average (${lv}) is the floor to watch; a close below it would damage the trend` : `a close back above the 50-day average (${lv}) is the first sign of repair`);
+    watch.push(last >= ma50 ? `a close under the 50-day average (${lv}) would damage the trend` : `a close back above the 50-day average (${lv}) is the first sign of repair`);
   }
   const offHigh = pc(last, hi);
-  if (offHigh > -2) watch.push(`price is pressing against its ${rn} high, where profit-taking from earlier buyers can appear`);
-  else if (offHigh < -15) watch.push(`it still sits ${Math.abs(offHigh).toFixed(0)}% under its ${rn} high, so there is a lot of overhead supply`);
+  if (offHigh > -2) watch.push(`it is pressing on its ${rn} high, where earlier buyers may sell`);
+  else if (offHigh < -15) watch.push(`it is still ${Math.abs(offHigh).toFixed(0)}% under its ${rn} high, leaving plenty of trapped holders above`);
+  const inWin = new Set(s.dates);
+  const an = (payload.anomalies || []).filter((a) => inWin.has(a.date)).sort((a, b) => Math.abs(b.return_pct) - Math.abs(a.return_pct))[0];
+  if (an && w.volatility) {
+    const normal = (w.volatility / Math.sqrt(252)) * 100;
+    const mult = Math.abs(an.return_pct) / normal;
+    if (mult >= 3) watch.push(`its biggest single day (${an.return_pct > 0 ? "+" : ""}${an.return_pct}% on ${an.date}) was about ${mult.toFixed(0)}x a normal day for this stock${ind && ind.shock ? `; ${ind.shock}` : ""}`);
+  }
+  if (watch.length) out.push(`What to watch: ${watch.join("; ")}.`);
+
+  // 6. How much to trust the projection
   const conf = confidence(payload.backtest);
   const fc = payload.forecast;
-  let fcBit = "";
   if (fc && fc.mean && fc.mean.length && fc.upper && fc.lower) {
     const k = fc.mean.length - 1;
     const width = (fc.upper[k] - fc.lower[k]) / 2 / last * 100;
-    fcBit = `The projection leans ${fc.mean[k] >= last ? "up" : "down"} but its 95% band is about ±${width.toFixed(0)}% wide and its replay on past data rated ${conf.level.toLowerCase()} confidence, so treat it as a rough direction check, not a target.`;
+    out.push(`The statistical projection leans ${fc.mean[k] >= last ? "up" : "down"}, but its band is about ±${width.toFixed(0)}% and it earned ${conf.level.toLowerCase()} confidence when replayed on past data, so it cannot know how ${co ? co.hinge.replace(/^its stock hinges on /, "") : "company news"} will play out.`);
   }
-  const inWin = new Set(s.dates);
-  const an = (payload.anomalies || []).filter((a) => inWin.has(a.date)).sort((a, b) => Math.abs(b.return_pct) - Math.abs(a.return_pct))[0];
-  const anBit = an ? `The sharpest shock in this window was ${an.return_pct > 0 ? "+" : ""}${an.return_pct}% on ${an.date}; jumps like that usually come from news or earnings, not drift.` : "";
-
-  return [`${regime}: ${why}.`, quality,
-    ctx.length ? `${ctx.join("; ")}.` : "",
-    watch.length ? `What would change the picture: ${watch.join("; ")}.` : "",
-    fcBit, anBit].filter(Boolean).join(" ");
+  return out.join(" ");
 }
 
 function liveNarrative(payload, s) {
