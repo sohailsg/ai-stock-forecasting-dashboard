@@ -6,9 +6,12 @@ Live: **https://sohail-ahmed.space/** (stocks page at `/dashboard/stocks.html`)
 > yfinance (unofficial).
 
 Static stock analytics built on the course sales pipeline: daily fetch for
-AAPL/MSFT/NVDA/TSLA → MA20/50, volatility, Sharpe, drawdown → ARIMA(1,1,1)
-30-day forecast with 95% band → honest backtest vs naive → z-score anomalies →
-Gemini insights → Chart.js UI → GitHub Pages auto-deploy. See
+12 US + India stocks across 9 sectors (tech, chips, EV, finance, consumer,
+energy, India IT/bank/energy) → MA20/50, volatility, Sharpe, drawdown →
+ARIMA(1,1,1) 30-day forecast with 95% band → honest backtest vs naive →
+z-score anomalies → Gemini insights + market overview → Chart.js UI with
+sector filter, compare mode (rebased), correlation heatmap and ranking table →
+GitHub Pages auto-deploy. See
 `docs/architecture.md`, `docs/forecasting.md`, `docs/deployment.md`,
 `docs/decisions.md` (ADR-001 Pages, ADR-002 yfinance).
 
@@ -22,7 +25,7 @@ uv run main.py
 python -m http.server 8000
 ```
 
-Env: `TICKERS` (default `AAPL,MSFT,NVDA,TSLA`), `FORECAST_HORIZON` (default 30),
+Env: `TICKERS` (default 12 US+India sector set, see `src/sectors.py`), `FORECAST_HORIZON` (default 30),
 `GEMINI_API_KEY`. SFTP vars in `.env.example` are course legacy (ADR-001).
 
 ---

@@ -7,7 +7,7 @@ Schema v1:
      stats {last_close, change_1m, volatility, sharpe, max_drawdown},
      anomalies [{date, price, return_pct, z}], backtest {...}}
   output/stocks/index.json:
-    {schema_version, tickers, correlations, generated_at}
+    {schema_version, tickers, sectors, correlations, generated_at}
 Insights (S9) are merged into index.json by insights.py; build leaves {}.
 """
 
@@ -27,6 +27,7 @@ from src import backtest as bt
 from src import fetch as fet
 from src import forecast as fc
 from src import process as proc
+from src import sectors as sec
 
 logger = logging.getLogger(__name__)
 SCHEMA_VERSION = 1
@@ -69,6 +70,7 @@ def build_all() -> dict:
     index = {
         "schema_version": SCHEMA_VERSION,
         "tickers": sorted(frames),
+        "sectors": {t: sec.get_sector(t) for t in frames},
         "correlations": proc.correlation_matrix(frames),
         "insights": {},
         "generated_at": dt.datetime.now(dt.timezone.utc).isoformat(),
@@ -79,6 +81,21 @@ def build_all() -> dict:
         logger.info("%s: stats=%s backtest=%s anomalies=%d", t,
                     payload["stats"], payload["backtest"].get("verdict"),
                     len(payload["anomalies"]))
+    # Lightweight snapshot for ranking/heatmap/compare without loading all files
+    index["snapshot"] = {}
+    for t in frames:
+        d = json.loads((OUT_DIR / f"{t}.json").read_text())
+        index["snapshot"][t] = {
+            "sector": sec.get_sector(t),
+            "last_close": d["stats"].get("last_close"),
+            "change_1m": d["stats"].get("change_1m"),
+            "volatility": d["stats"].get("volatility"),
+            "sharpe": d["stats"].get("sharpe"),
+            "max_drawdown": d["stats"].get("max_drawdown"),
+            "verdict": d["backtest"].get("verdict"),
+            "model_mape": d["backtest"].get("model_mape"),
+            "anomalies": len(d.get("anomalies", [])),
+        }
     (OUT_DIR / "index.json").write_text(json.dumps(index))
     logger.info("wrote %d tickers + index.json", len(frames))
     return index

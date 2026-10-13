@@ -87,3 +87,68 @@ def test_nan_to_null_in_json():
 
     assert _clean_num(float("nan")) is None
     assert json.dumps({"x": _clean_num(float("nan"))}) == '{"x": null}'
+
+
+def test_sector_universe_is_12_us_india():
+    from src import sectors as sec
+
+    assert len(sec.DEFAULT_TICKERS) == 12
+    assert "RELIANCE.NS" in sec.DEFAULT_TICKERS
+    assert "AAPL" in sec.DEFAULT_TICKERS
+    assert sec.get_sector("NVDA") == "Semiconductors"
+    assert sec.get_sector("TCS.NS") == "India IT"
+    assert sec.get_sector("UNKNOWN.X") == "Other"
+
+
+def test_fetch_defaults_to_sector_universe(monkeypatch):
+    import os
+
+    from src import fetch as fet
+
+    monkeypatch.delenv("TICKERS", raising=False)
+    assert fet.get_tickers() == list(fet.DEFAULT_TICKERS)
+    assert len(fet.get_tickers()) == 12
+
+
+def test_insights_fallback_persists_to_index(tmp_path, monkeypatch):
+    """Regression: fallback path must write insights into index.json."""
+    import os
+
+    from src import insights as ins
+
+    idx = {
+        "schema_version": 1,
+        "tickers": ["AAA"],
+        "insights": {},
+        "generated_at": "2026-01-01T00:00:00+00:00",
+    }
+    (tmp_path / "AAA.json").write_text(json.dumps({
+        "stats": {"last_close": 10.0, "change_1m": 2.0, "volatility": 0.2,
+                  "sharpe": 1.0, "max_drawdown": -5.0},
+        "backtest": {"verdict": "beats naive", "model_mape": 1.0, "naive_mape": 2.0},
+        "forecast": {"method": "ARIMA(1,1,1)-log"},
+        "anomalies": [],
+    }))
+    (tmp_path / "index.json").write_text(json.dumps(idx))
+    monkeypatch.setattr(ins, "INDEX_PATH", tmp_path / "index.json")
+    monkeypatch.setattr(ins, "TICKER_DIR", tmp_path)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+    out = ins.build_insights()
+    assert out["AAA"].startswith("AAA rose")
+    saved = json.loads((tmp_path / "index.json").read_text())
+    assert saved["insights"]["AAA"] == out["AAA"]  # persisted, not {}
+    assert "market_insight" in saved and "AAA" in saved["market_insight"]
+
+
+def test_market_fallback_names_movers():
+    from src import insights as ins
+
+    snap = {
+        "AAA": {"sector": "Tech", "change_1m": 5.0, "volatility": 0.2,
+                "sharpe": 1.0, "verdict": "beats naive"},
+        "BBB": {"sector": "Energy", "change_1m": -3.0, "volatility": 0.3,
+                "sharpe": 0.2, "verdict": "worse than naive"},
+    }
+    txt = ins._market_fallback(snap)
+    assert "AAA" in txt and "BBB" in txt and "1 of 2" in txt

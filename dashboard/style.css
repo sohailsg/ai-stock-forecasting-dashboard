@@ -99,7 +99,7 @@ nav.topnav a[aria-current="page"] { background: var(--surface); color: var(--tex
 .btn[aria-pressed="true"] { background: var(--text); border-color: var(--text); color: var(--bg); }
 
 select, input[type="range"] { accent-color: var(--primary); }
-select {
+select, input[type="search"] {
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
@@ -107,6 +107,18 @@ select {
   padding: 0.45rem 0.6rem;
   font-size: 0.9rem;
 }
+
+/* Compare pills + heatmap + ranking */
+.pill { display: inline-flex; gap: 0.35rem; align-items: center; }
+#heatmap td, #heatmap th { border: 1px solid var(--border); padding: 0.35rem 0.5rem; text-align: center; }
+#heatmap td.cell { cursor: pointer; font-weight: 700; }
+#heatmap td.cell:hover { outline: 2px solid var(--primary); outline-offset: -2px; }
+#rank-table td, #rank-table th { border-bottom: 1px solid var(--border); padding: 0.4rem; }
+#rank-table tbody tr:hover { background: var(--surface-2); }
+#rank-table tr.me { background: var(--surface-2); }
+.verdict-beats { color: #1e9e6a; font-weight: 700; }
+.verdict-worse { color: var(--danger); font-weight: 700; }
+[data-theme="dark"] .verdict-beats { color: #5fd6b5; }
 
 /* ── KPI cards ────────────────────────────────────────────────────────────── */
 .kpi-cards {

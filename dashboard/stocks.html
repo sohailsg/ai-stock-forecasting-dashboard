@@ -24,9 +24,16 @@
 
     <section class="chart-section" aria-label="Controls">
       <div class="controls">
+        <label for="sector"><span class="group-label">Sector</span>
+          <select id="sector"><option value="">All sectors</option></select>
+        </label>
         <label for="ticker"><span class="group-label">Ticker</span>
           <select id="ticker"></select>
         </label>
+        <label for="search"><span class="group-label">Search</span>
+          <input type="search" id="search" placeholder="e.g. RELIANCE" autocomplete="off" />
+        </label>
+      </div>
         <div class="group" role="group" aria-label="History range">
           <span class="group-label">Range</span>
           <button class="btn range-btn" data-range="30">1M</button>
@@ -70,8 +77,38 @@
     <section class="chart-section" aria-label="Insight and anomalies">
       <h2>AI Insight <span class="tag">(AI-generated, educational only)</span></h2>
       <p id="ai-insight">Loading…</p>
+      <p class="kpi-sub" id="ai-tag">Forecast reliability: —</p>
       <h2 style="margin-top:1.25rem">Recent anomalies</h2>
       <ul class="clean" id="anomaly-list"><li>Loading…</li></ul>
+    </section>
+
+    <section class="chart-section" aria-label="Market overview">
+      <h2>Suggest &amp; Compare <span class="tag">(all 12 stocks, educational only)</span></h2>
+      <p id="market-insight">Loading…</p>
+      <div class="kpi-cards" id="sector-cards" style="margin:1rem 0 0"></div>
+      <h2 style="margin-top:1.25rem">Ranking <span class="tag">(by 1-month change)</span></h2>
+      <div style="overflow-x:auto">
+      <table id="rank-table" style="width:100%;border-collapse:collapse;font-size:.88rem;font-variant-numeric:tabular-nums">
+        <thead><tr>
+          <th style="text-align:left;padding:.4rem">#</th><th style="text-align:left">Ticker</th>
+          <th style="text-align:left">Sector</th><th style="text-align:right">1M %</th>
+          <th style="text-align:right">Vol</th><th style="text-align:right">Sharpe</th>
+          <th style="text-align:left">Backtest</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+      </div>
+    </section>
+
+    <section class="chart-section" aria-label="Compare">
+      <h2>Compare <span class="tag">(rebased to 100, max 3)</span></h2>
+      <div class="toggles" id="cmp-picks" role="group" aria-label="Tickers to compare"></div>
+      <div class="chart-wrap" style="margin-top:.75rem"><canvas id="chart-cmp"></canvas></div>
+    </section>
+
+    <section class="chart-section" aria-label="Correlation heatmap">
+      <h2>Correlation heatmap <span class="tag">(daily returns; click a cell to compare)</span></h2>
+      <div style="overflow-x:auto"><table id="heatmap" style="border-collapse:collapse;font-size:.8rem;font-variant-numeric:tabular-nums"></table></div>
     </section>
   </main>
 

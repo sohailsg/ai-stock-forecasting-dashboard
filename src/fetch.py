@@ -4,7 +4,7 @@ Downloads daily adjusted-close history via yfinance, validates it,
 and caches per-ticker CSVs under data/stocks/<TICKER>.csv.
 
 Design (per S4 acceptance criteria):
-- Ticker list configurable via TICKERS env var (default US-only v1 set).
+- Ticker list configurable via TICKERS env var (default 12-ticker US+India set).
 - 5 years of daily prices, auto-adjusted for splits/dividends.
 - Handles the yfinance multi-index column quirk (recent versions).
 - Validates: min rows, no future dates, no non-positive prices,
@@ -22,12 +22,15 @@ import time
 
 import pandas as pd
 
+from src import sectors as sec
+
 logger = logging.getLogger(__name__)
 
 CACHE_DIR = pathlib.Path("data/stocks")
-DEFAULT_TICKERS = ("AAPL", "MSFT", "NVDA", "TSLA")
+DEFAULT_TICKERS = tuple(sec.DEFAULT_TICKERS)
 MIN_ROWS = 200
 MAX_RETRIES = 4
+INTER_TICKER_DELAY = 2  # seconds between tickers to ease throttling (12-ticker universe)
 
 
 def get_tickers() -> list[str]:
@@ -112,10 +115,14 @@ def fetch_all(tickers: list[str] | None = None) -> dict[str, pd.DataFrame]:
     """Fetch every ticker; bad tickers are skipped, never fatal."""
     tickers = tickers or get_tickers()
     results: dict[str, pd.DataFrame] = {}
-    for t in tickers:
+    for i, t in enumerate(tickers):
+        if i > 0:
+            time.sleep(INTER_TICKER_DELAY)
+        t0 = time.time()
         df = fetch_ticker(t)
         if df is not None:
             results[t] = df
+        logger.info("%s: done in %.1fs", t, time.time() - t0)
     logger.info("fetch_all: %d/%d tickers OK", len(results), len(tickers))
     return results
 
