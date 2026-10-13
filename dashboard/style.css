@@ -1,0 +1,78 @@
+/* ── Reset & base ─────────────────────────────────────────────────────────── */
+
+/* box-sizing: border-box makes width/height include padding and border,
+   which is much more intuitive than the default browser behaviour. */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: system-ui, sans-serif; /* uses the OS default font — no import needed */
+  background: #f0f2f5;
+  color: #222;
+  padding: 1.5rem;
+}
+
+header h1 {
+  font-size: 1.75rem;
+  margin-bottom: 1.5rem;
+  color: #1a1a2e;
+}
+
+
+/* ── KPI cards ────────────────────────────────────────────────────────────── */
+
+/* CSS Grid with auto-fit + minmax makes the cards responsive automatically:
+   they fill the row and wrap to the next line when the screen is too narrow.
+   No media queries needed. */
+.kpi-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 1.25rem 1rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.card h2 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888;
+  margin-bottom: 0.5rem;
+}
+
+.kpi-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+
+/* ── Chart sections ───────────────────────────────────────────────────────── */
+
+.chart-section {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  margin-bottom: 1.5rem;
+}
+
+.chart-section h2 {
+  font-size: 1rem;
+  color: #555;
+  margin-bottom: 1rem;
+}
+
+/* Limit chart height so tall charts don't push content off screen */
+.chart-section canvas {
+  max-height: 320px;
+}

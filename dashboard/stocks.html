@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stock Forecasting Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .controls { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; margin-bottom: 1rem; }
+    .controls select, .controls button { padding: .45rem .7rem; font-size: .9rem; }
+    .range-btn[aria-pressed="true"] { background: #1a1a2e; color: #fff; }
+    .toggles label { margin-right: .8rem; font-size: .9rem; }
+    nav.topnav { margin-bottom: 1rem; }
+    nav.topnav a { margin-right: 1rem; }
+    .disclaimer { font-size: .8rem; color: #666; margin-top: 1rem; }
+    #chart-main { max-height: 420px; }
+    .banner { background: #fff3cd; border: 1px solid #e6c200; padding: .6rem 1rem; border-radius: 6px; margin-bottom: 1rem; display: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Stock Forecasting Dashboard</h1>
+    <nav class="topnav" aria-label="Site">
+      <a href="index.html">Sales</a>
+      <a href="stocks.html" aria-current="page"><strong>Stocks</strong></a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="banner" id="stale-banner" role="alert"></div>
+
+    <section class="chart-section" aria-label="Controls">
+      <div class="controls">
+        <label for="ticker">Ticker:
+          <select id="ticker"></select>
+        </label>
+        <div role="group" aria-label="Range">
+          <button class="range-btn" data-range="30">1M</button>
+          <button class="range-btn" data-range="180">6M</button>
+          <button class="range-btn" data-range="365">1Y</button>
+          <button class="range-btn" data-range="1825">5Y</button>
+        </div>
+        <div class="toggles">
+          <label><input type="checkbox" id="t-ma20" checked /> MA20</label>
+          <label><input type="checkbox" id="t-ma50" checked /> MA50</label>
+          <label><input type="checkbox" id="t-fc" checked /> Forecast</label>
+          <label><input type="checkbox" id="t-an" checked /> Anomalies</label>
+        </div>
+      </div>
+    </section>
+
+    <section class="kpi-cards" aria-label="Key metrics">
+      <div class="card"><h2>Last close</h2><p class="kpi-value" id="kpi-close">—</p></div>
+      <div class="card"><h2>1M change</h2><p class="kpi-value" id="kpi-chg">—</p></div>
+      <div class="card"><h2>Volatility</h2><p class="kpi-value" id="kpi-vol">—</p></div>
+      <div class="card"><h2>Sharpe</h2><p class="kpi-value" id="kpi-sharpe">—</p></div>
+      <div class="card"><h2>Max drawdown</h2><p class="kpi-value" id="kpi-dd">—</p></div>
+      <div class="card"><h2>Backtest</h2><p class="kpi-value" id="kpi-bt" style="font-size:1rem">—</p></div>
+    </section>
+
+    <section class="chart-section">
+      <h2 id="chart-title">Price</h2>
+      <canvas id="chart-main"></canvas>
+    </section>
+
+    <section class="chart-section">
+      <h2>AI Insight <span style="font-weight:normal;font-size:.8rem">(AI-generated)</span></h2>
+      <p id="ai-insight">Loading…</p>
+      <h2 style="margin-top:1rem">Anomalies</h2>
+      <ul id="anomaly-list"></ul>
+      <p class="disclaimer">Educational only, not financial advice. Data: Yahoo Finance via
+      yfinance (unofficial). Forecast is a statistical extrapolation (ARIMA) with honest
+      backtest vs naive — see verdict above.</p>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="stocks.js"></script>
+</body>
+</html>

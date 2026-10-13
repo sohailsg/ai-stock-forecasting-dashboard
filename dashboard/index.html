@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sales Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header>
+    <h1>Sales Dashboard</h1>
+    <nav aria-label="Site">
+      <a href="index.html" aria-current="page"><strong>Sales</strong></a>
+      <a href="stocks.html" style="margin-left:1rem">Stocks</a>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- KPI summary cards — values are filled in by app.js -->
+    <section class="kpi-cards">
+      <div class="card">
+        <h2>Total Revenue</h2>
+        <p class="kpi-value" id="kpi-revenue">—</p>
+      </div>
+      <div class="card">
+        <h2>Total Units Sold</h2>
+        <p class="kpi-value" id="kpi-units">—</p>
+      </div>
+      <div class="card">
+        <h2>Top Product</h2>
+        <p class="kpi-value" id="kpi-top-product">—</p>
+      </div>
+      <div class="card">
+        <h2>Top Region</h2>
+        <p class="kpi-value" id="kpi-top-region">—</p>
+      </div>
+    </section>
+
+    <!-- AI-generated insights card — text is loaded from insights.json -->
+    <section class="chart-section">
+      <h2>AI Insights</h2>
+      <p id="ai-insights">Loading insights...</p>
+    </section>
+
+    <!-- Each <canvas> is a Chart.js drawing surface.
+         The id must match what app.js uses to find the element. -->
+
+    <section class="chart-section">
+      <h2>Monthly Revenue</h2>
+      <canvas id="chart-monthly"></canvas>
+    </section>
+
+    <section class="chart-section">
+      <h2>Revenue by Product</h2>
+      <canvas id="chart-product"></canvas>
+    </section>
+
+    <section class="chart-section">
+      <h2>Revenue by Region</h2>
+      <canvas id="chart-region"></canvas>
+    </section>
+
+  </main>
+
+  <!-- Chart.js loaded from a CDN — no npm or build step required.
+       It must come BEFORE app.js so the Chart object is available. -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="app.js"></script>
+
+</body>
+</html>

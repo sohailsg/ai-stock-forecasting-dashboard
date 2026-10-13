@@ -1,0 +1,22 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.ruff_cache/
+
+# Virtual environments
+.venv
+
+
+# Generated JSON output (recreated on each run)
+output/*.json
+output/**/*.json
+
+# Cached market data (recreated by src/fetch.py; cached in CI)
+data/stocks/*.csv
+
+# Environment secrets — never commit passwords
+.env

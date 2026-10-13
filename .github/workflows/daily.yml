@@ -1,0 +1,47 @@
+name: daily
+# S13: refresh after US close (~21:00 UTC), weekdays only. No PC needed.
+on:
+  schedule:
+    - cron: "30 22 * * 1-5"
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --group dev
+      - uses: actions/cache@v4
+        with:
+          path: data/stocks
+          key: stocks-${{ hashFiles('data/stocks/*.csv') }}
+          restore-keys: stocks-
+      - run: uv run python -m src.build
+      - run: uv run python -m src.insights
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      - name: assemble site
+        run: |
+          rm -rf _site && mkdir -p _site/output
+          cp dashboard/index.html dashboard/stocks.html dashboard/app.js dashboard/stocks.js dashboard/style.css dashboard/CNAME _site/
+          cp -r output/stocks _site/output/stocks
+          echo "sohail-ahmed.space" > _site/CNAME
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+  deploy:
+    needs: refresh
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
