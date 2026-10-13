@@ -18,11 +18,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --group dev
       - run: uv run pytest tests/ -q
-        # Sales JSONs: analyze.py writes the 4 data files before insights;
-        # without GEMINI_API_KEY the insights step raises, so tolerate it.
-      - run: uv run analyze.py || true
         # Stocks pipeline needs no secrets (Gemini falls back to rule-based).
-        # Daily refresh with insights uses daily.yml which has GEMINI_API_KEY.
       - run: uv run python -m src.build
       - run: uv run python -m src.insights
         env:
@@ -30,8 +26,7 @@ jobs:
       - name: assemble site
         run: |
           rm -rf _site && mkdir -p _site/output
-          cp dashboard/index.html dashboard/stocks.html dashboard/app.js dashboard/stocks.js dashboard/theme.js dashboard/style.css dashboard/CNAME _site/
-          cp -r output/summary.json output/monthly_revenue.json output/revenue_by_product.json output/revenue_by_region.json output/insights.json _site/output/ 2>/dev/null || true
+          cp dashboard/index.html dashboard/stocks.js dashboard/theme.js dashboard/style.css dashboard/CNAME _site/
           cp -r output/stocks _site/output/stocks
           echo "sohail-ahmed.space" > _site/CNAME
       - uses: actions/upload-pages-artifact@v3

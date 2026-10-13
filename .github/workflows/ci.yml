@@ -10,5 +10,5 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --group dev
-      - run: uv run ruff check src tests analyze.py main.py || true
+      - run: uv run ruff check src tests main.py upload.py || true
       - run: uv run pytest tests/ -q

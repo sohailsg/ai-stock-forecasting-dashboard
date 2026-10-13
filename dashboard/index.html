@@ -3,80 +3,120 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Sales reporting dashboard: revenue summaries and Chart.js visualisations. Part of the AI stock forecasting capstone." />
-  <title>Sales Dashboard — sohail-ahmed.space</title>
+  <meta name="description" content="Interactive stock forecasting dashboard: ARIMA projections with honest backtests, anomaly flags and AI insights. Educational use only." />
+  <title>Stock Forecasting Dashboard — sohail-ahmed.space</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
   <header class="topbar">
-    <h1>Sales Dashboard</h1>
-    <nav class="topnav" aria-label="Site">
-      <a href="index.html" aria-current="page">Sales</a>
-      <a href="stocks.html">Stocks</a>
-    </nav>
+    <h1>Stock Forecasting</h1>
     <span class="spacer"></span>
     <button class="btn" data-theme-toggle aria-pressed="false" title="Toggle dark mode">🌙 Dark</button>
   </header>
 
   <main>
+    <div class="banner" id="stale-banner" role="alert"></div>
 
-    <!-- KPI summary cards — values are filled in by app.js -->
-    <section class="kpi-cards" aria-label="Summary" aria-live="polite">
-      <div class="card">
-        <h2>Total Revenue</h2>
-        <p class="kpi-value loading" id="kpi-revenue">—</p>
+    <section class="chart-section" aria-label="Controls">
+      <div class="controls">
+        <label for="sector"><span class="group-label">Sector</span>
+          <select id="sector"><option value="">All sectors</option></select>
+        </label>
+        <label for="ticker"><span class="group-label">Ticker</span>
+          <select id="ticker"></select>
+        </label>
+        <label for="search"><span class="group-label">Search</span>
+          <input type="search" id="search" placeholder="e.g. RELIANCE" autocomplete="off" />
+        </label>
       </div>
-      <div class="card">
-        <h2>Total Units Sold</h2>
-        <p class="kpi-value loading" id="kpi-units">—</p>
+        <div class="group" role="group" aria-label="History range">
+          <span class="group-label">Range</span>
+          <button class="btn range-btn" data-range="30">1M</button>
+          <button class="btn range-btn" data-range="180">6M</button>
+          <button class="btn range-btn" data-range="365">1Y</button>
+          <button class="btn range-btn" data-range="1825">5Y</button>
+        </div>
+        <div class="toggles" role="group" aria-label="Overlays">
+          <label><input type="checkbox" id="t-ma20" checked /> MA20</label>
+          <label><input type="checkbox" id="t-ma50" checked /> MA50</label>
+          <label><input type="checkbox" id="t-fc" checked /> Forecast</label>
+          <label><input type="checkbox" id="t-an" checked /> Anomalies</label>
+        </div>
       </div>
-      <div class="card">
-        <h2>Top Product</h2>
-        <p class="kpi-value loading" id="kpi-top-product">—</p>
+      <div class="controls" style="margin-top:.75rem">
+        <div class="slider-row">
+          <label for="horizon"><span class="group-label">Forecast shown</span></label>
+          <input type="range" id="horizon" min="5" max="30" step="1" value="30" />
+          <output id="horizon-out" for="horizon">30 days</output>
+        </div>
+        <span class="spacer" style="flex:1"></span>
+        <button class="btn" id="btn-csv" title="Download current view as CSV">⬇ CSV</button>
+        <button class="btn" id="btn-png" title="Download chart as PNG">🖼 PNG</button>
       </div>
-      <div class="card">
-        <h2>Top Region</h2>
-        <p class="kpi-value loading" id="kpi-top-region">—</p>
+    </section>
+
+    <section class="kpi-cards" aria-label="Key metrics" aria-live="polite">
+      <div class="card"><h2>Last close</h2><p class="kpi-value loading" id="kpi-close">—</p></div>
+      <div class="card"><h2>1M change</h2><p class="kpi-value loading" id="kpi-chg">—</p></div>
+      <div class="card"><h2>Volatility</h2><p class="kpi-value loading" id="kpi-vol">—</p></div>
+      <div class="card"><h2>Sharpe</h2><p class="kpi-value loading" id="kpi-sharpe">—</p></div>
+      <div class="card"><h2>Max drawdown</h2><p class="kpi-value loading" id="kpi-dd">—</p></div>
+      <div class="card"><h2>Backtest</h2><p class="kpi-value loading" id="kpi-bt" style="font-size:.95rem">—</p></div>
+    </section>
+
+    <section class="chart-section" aria-label="Price chart">
+      <h2 id="chart-title">Price</h2>
+      <div class="chart-wrap tall"><canvas id="chart-main"></canvas></div>
+    </section>
+
+    <section class="chart-section" aria-label="Insight and anomalies">
+      <h2>AI Insight <span class="tag">(AI-generated, educational only)</span></h2>
+      <p id="ai-insight">Loading…</p>
+      <p class="kpi-sub" id="ai-tag">Forecast reliability: —</p>
+      <h2 style="margin-top:1.25rem">Recent anomalies</h2>
+      <ul class="clean" id="anomaly-list"><li>Loading…</li></ul>
+    </section>
+
+    <section class="chart-section" aria-label="Market overview">
+      <h2>Suggest &amp; Compare <span class="tag">(all 12 stocks, educational only)</span></h2>
+      <p id="market-insight">Loading…</p>
+      <div class="kpi-cards" id="sector-cards" style="margin:1rem 0 0"></div>
+      <h2 style="margin-top:1.25rem">Ranking <span class="tag">(by 1-month change)</span></h2>
+      <div style="overflow-x:auto">
+      <table id="rank-table" style="width:100%;border-collapse:collapse;font-size:.88rem;font-variant-numeric:tabular-nums">
+        <thead><tr>
+          <th style="text-align:left;padding:.4rem">#</th><th style="text-align:left">Ticker</th>
+          <th style="text-align:left">Sector</th><th style="text-align:right">1M %</th>
+          <th style="text-align:right">Vol</th><th style="text-align:right">Sharpe</th>
+          <th style="text-align:left">Backtest</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
       </div>
     </section>
 
-    <!-- AI-generated insights card — text is loaded from insights.json -->
-    <section class="chart-section">
-      <h2>AI Insights <span class="tag">(AI-generated)</span></h2>
-      <p id="ai-insights">Loading insights...</p>
+    <section class="chart-section" aria-label="Compare">
+      <h2>Compare <span class="tag">(rebased to 100, max 3)</span></h2>
+      <div class="toggles" id="cmp-picks" role="group" aria-label="Tickers to compare"></div>
+      <div class="chart-wrap" style="margin-top:.75rem"><canvas id="chart-cmp"></canvas></div>
     </section>
 
-    <!-- Each <canvas> is a Chart.js drawing surface.
-         The id must match what app.js uses to find the element. -->
-
-    <section class="chart-section">
-      <h2>Monthly Revenue</h2>
-      <div class="chart-wrap"><canvas id="chart-monthly"></canvas></div>
+    <section class="chart-section" aria-label="Correlation heatmap">
+      <h2>Correlation heatmap <span class="tag">(daily returns; click a cell to compare)</span></h2>
+      <div style="overflow-x:auto"><table id="heatmap" style="border-collapse:collapse;font-size:.8rem;font-variant-numeric:tabular-nums"></table></div>
     </section>
-
-    <section class="chart-section">
-      <h2>Revenue by Product</h2>
-      <div class="chart-wrap"><canvas id="chart-product"></canvas></div>
-    </section>
-
-    <section class="chart-section">
-      <h2>Revenue by Region</h2>
-      <div class="chart-wrap"><canvas id="chart-region"></canvas></div>
-    </section>
-
   </main>
 
   <footer class="site">
-    <span>Course baseline sales dashboard.</span>
-    <span class="dot">See also the <a href="stocks.html">stock forecasting page</a>.</span>
+    <span>Educational only, not financial advice.</span>
+    <span class="dot">Data: Yahoo Finance via yfinance (unofficial).</span>
+    <span class="dot" id="gen-stamp">Data: —</span>
   </footer>
 
-  <!-- Chart.js loaded from a CDN — no npm or build step required.
-       It must come BEFORE app.js so the Chart object is available. -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="theme.js"></script>
-  <script src="app.js"></script>
+  <script src="stocks.js"></script>
 
 </body>
 </html>

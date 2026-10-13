@@ -23,7 +23,6 @@ jobs:
           path: data/stocks
           key: stocks-${{ hashFiles('data/stocks/*.csv') }}
           restore-keys: stocks-
-      - run: uv run analyze.py || true
       - run: uv run python -m src.build
       - run: uv run python -m src.insights
         env:
@@ -31,7 +30,7 @@ jobs:
       - name: assemble site
         run: |
           rm -rf _site && mkdir -p _site/output
-          cp dashboard/index.html dashboard/stocks.html dashboard/app.js dashboard/stocks.js dashboard/theme.js dashboard/style.css dashboard/CNAME _site/
+          cp dashboard/index.html dashboard/stocks.js dashboard/theme.js dashboard/style.css dashboard/CNAME _site/
           cp -r output/stocks _site/output/stocks
           echo "sohail-ahmed.space" > _site/CNAME
       - uses: actions/upload-pages-artifact@v3
