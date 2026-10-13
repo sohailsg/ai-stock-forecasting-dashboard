@@ -18,6 +18,9 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --group dev
       - run: uv run pytest tests/ -q
+        # Sales JSONs: analyze.py writes the 4 data files before insights;
+        # without GEMINI_API_KEY the insights step raises, so tolerate it.
+      - run: uv run analyze.py || true
         # Stocks pipeline needs no secrets (Gemini falls back to rule-based).
         # Daily refresh with insights uses daily.yml which has GEMINI_API_KEY.
       - run: uv run python -m src.build

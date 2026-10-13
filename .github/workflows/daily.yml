@@ -23,6 +23,7 @@ jobs:
           path: data/stocks
           key: stocks-${{ hashFiles('data/stocks/*.csv') }}
           restore-keys: stocks-
+      - run: uv run analyze.py || true
       - run: uv run python -m src.build
       - run: uv run python -m src.insights
         env:
